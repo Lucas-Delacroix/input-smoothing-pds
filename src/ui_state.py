@@ -15,17 +15,14 @@ from config import (
 
 @dataclass
 class ViewTransform:
-    """Gerencia transformações de view (zoom e pan)"""
     zoom: float = ZOOM_DEFAULT
     pan_x: float = 0.0
     pan_y: float = 0.0
 
     def apply(self, x: float, y: float) -> tuple[float, float]:
-        """Aplica zoom e pan a um ponto"""
         return (x * self.zoom + self.pan_x, y * self.zoom + self.pan_y)
 
     def reset(self) -> None:
-        """Reseta zoom e pan"""
         self.zoom = ZOOM_DEFAULT
         self.pan_x = 0.0
         self.pan_y = 0.0
@@ -33,7 +30,6 @@ class ViewTransform:
 
 @dataclass
 class VisibilityState:
-    """Gerencia visibilidade das linhas"""
     raw_visible: bool = DEFAULT_RAW_VISIBLE
     ma_visible: bool = DEFAULT_MA_VISIBLE
     exp_visible: bool = DEFAULT_EXP_VISIBLE
@@ -41,7 +37,6 @@ class VisibilityState:
 
 @dataclass
 class MetricsTracker:
-    """Rastreia métricas de performance"""
     fps_history: Deque[float]
     latency_history: Deque[float]
 
@@ -68,7 +63,6 @@ class MetricsTracker:
 
 @dataclass
 class ParamChangeIndicator:
-    """Indicador visual de mudança de parâmetros"""
     active: bool = False
     timer: int = 0
 

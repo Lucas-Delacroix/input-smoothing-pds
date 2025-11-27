@@ -1,4 +1,3 @@
-"""Módulo para gerar gráfico 3D dos resultados de suavização"""
 from typing import Optional
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -8,15 +7,6 @@ from input_device import InputSmoother
 
 
 def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None) -> None:
-    """
-    Gera um gráfico 3D mostrando o caminho do mouse e as suavizações.
-    O eixo Z representa o tempo (frame/amostra).
-    
-    Args:
-        smoother: Instância do InputSmoother com os dados
-        output_path: Caminho para salvar a imagem. Se None, mostra na tela.
-    """
-    # Coleta dados dos traces
     raw_points = list(smoother.raw_trace)
     ma_points = list(smoother.moving_average_trace)
     exp_points = list(smoother.exp_trace)
@@ -28,10 +18,8 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Prepara dados para plotagem
     time_steps = np.arange(len(raw_points))
 
-    # Extrai coordenadas
     raw_x = [p.x for p in raw_points]
     raw_y = [p.y for p in raw_points]
 
@@ -41,23 +29,19 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
     exp_x = [p.x for p in exp_points]
     exp_y = [p.y for p in exp_points]
 
-    # Plota linha raw (vermelha)
     if raw_x and raw_y:
         ax.plot(raw_x, raw_y, time_steps, 
                 color='red', linewidth=1, alpha=0.6, label='Raw Input')
 
-    # Plota linha moving average (verde)
     if ma_x and ma_y and len(ma_x) == len(time_steps[:len(ma_x)]):
         ma_time = time_steps[:len(ma_x)]
         ax.plot(ma_x, ma_y, ma_time,
                 color='green', linewidth=2, alpha=0.8, label='Moving Average')
 
-    # Plota linha exponential smoothing (azul)
     if exp_x and exp_y:
         ax.plot(exp_x, exp_y, time_steps,
                 color='blue', linewidth=2, alpha=0.8, label='Exponential Smoothing')
 
-    # Configurações do gráfico
     ax.set_xlabel('X Position', fontsize=10)
     ax.set_ylabel('Y Position', fontsize=10)
     ax.set_zlabel('Time (samples)', fontsize=10)
@@ -66,10 +50,8 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
                  fontsize=12, fontweight='bold')
     ax.legend(loc='upper left')
 
-    # Ajusta a visualização para melhor ângulo
     ax.view_init(elev=20, azim=45)
 
-    # Adiciona grid
     ax.grid(True, alpha=0.3)
 
     if output_path:
@@ -82,14 +64,6 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
 
 
 def generate_3d_surface_map(smoother: InputSmoother, output_path: Optional[str] = None) -> None:
-    """
-    Gera um mapa de superfície 3D mostrando a densidade do caminho percorrido.
-    Cria um heatmap 3D baseado na frequência de visitas a cada região.
-    
-    Args:
-        smoother: Instância do InputSmoother com os dados
-        output_path: Caminho para salvar a imagem. Se None, mostra na tela.
-    """
     raw_points = list(smoother.raw_trace)
     
     if not raw_points or len(raw_points) < 10:
@@ -98,22 +72,18 @@ def generate_3d_surface_map(smoother: InputSmoother, output_path: Optional[str] 
 
     fig = plt.figure(figsize=(14, 10))
     
-    # Subplot 1: Raw input
     ax1 = fig.add_subplot(221, projection='3d')
     _plot_density_map(ax1, raw_points, 'Raw Input Density Map', 'Reds')
     
-    # Subplot 2: Moving Average
     if smoother.moving_average_trace:
         ma_points = list(smoother.moving_average_trace)
         ax2 = fig.add_subplot(222, projection='3d')
         _plot_density_map(ax2, ma_points, 'Moving Average Density Map', 'Greens')
     
-    # Subplot 3: Exponential Smoothing
     exp_points = list(smoother.exp_trace)
     ax3 = fig.add_subplot(223, projection='3d')
     _plot_density_map(ax3, exp_points, 'Exponential Smoothing Density Map', 'Blues')
     
-    # Subplot 4: Comparação lado a lado
     ax4 = fig.add_subplot(224, projection='3d')
     time_steps = np.arange(len(raw_points))
     raw_x = [p.x for p in raw_points]
@@ -142,18 +112,15 @@ def generate_3d_surface_map(smoother: InputSmoother, output_path: Optional[str] 
 
 
 def _plot_density_map(ax, points, title, colormap):
-    """Helper para plotar mapa de densidade"""
     if not points:
         return
     
     x_coords = [p.x for p in points]
     y_coords = [p.y for p in points]
     
-    # Cria grid para o heatmap
     x_min, x_max = min(x_coords), max(x_coords)
     y_min, y_max = min(y_coords), max(y_coords)
     
-    # Adiciona margem
     x_range = x_max - x_min
     y_range = y_max - y_min
     x_min -= x_range * 0.1
@@ -161,30 +128,25 @@ def _plot_density_map(ax, points, title, colormap):
     y_min -= y_range * 0.1
     y_max += y_range * 0.1
     
-    # Cria grid
     grid_size = 30
     x_grid = np.linspace(x_min, x_max, grid_size)
     y_grid = np.linspace(y_min, y_max, grid_size)
     X, Y = np.meshgrid(x_grid, y_grid)
     
-    # Calcula densidade usando kernel gaussiano simples
     Z = np.zeros_like(X)
     for px, py in zip(x_coords, y_coords):
         dist_sq = (X - px)**2 + (Y - py)**2
         sigma = min(x_range, y_range) / 10
         Z += np.exp(-dist_sq / (2 * sigma**2))
     
-    # Normaliza
     if Z.max() > 0:
         Z = Z / Z.max()
     
-    # Plota superfície
     surf = ax.plot_surface(X, Y, Z, cmap=colormap, alpha=0.7, linewidth=0, antialiased=True)
     ax.set_xlabel('X Position')
     ax.set_ylabel('Y Position')
     ax.set_zlabel('Density')
     ax.set_title(title)
     ax.view_init(elev=30, azim=45)
-    # Adiciona colorbar usando a figura do axes
     ax.figure.colorbar(surf, ax=ax, shrink=0.5)
 

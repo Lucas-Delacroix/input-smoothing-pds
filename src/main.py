@@ -13,8 +13,12 @@ from config import (
     MAX_BUFFER,
     MOVING_AVERAGE_MIN,
     PARAM_CHANGE_INDICATOR_DURATION,
+    TREMOR_ENABLED,
+    TREMOR_INTENSITY,
+    TREMOR_FREQUENCY,
 )
 from input_device import InputSmoother
+from tremor_simulator import TremorSimulator
 from ui import (
     build_font,
     create_window,
@@ -45,7 +49,12 @@ def main() -> None:
         max_alpha=ALPHA_MAX,
     )
 
-    # Estado da UI
+    tremor_sim = TremorSimulator(
+        enabled=TREMOR_ENABLED,
+        intensity=TREMOR_INTENSITY,
+        frequency=TREMOR_FREQUENCY,
+    )
+
     history_enabled = DEFAULT_HISTORY_ENABLED
     view_transform = ViewTransform()
     visibility = VisibilityState()
@@ -60,7 +69,6 @@ def main() -> None:
         dt_ms = int((frame_start - last_time) * 1000)
         last_time = frame_start
 
-        # Processa eventos
         running, history_enabled, fullscreen, generate_3d = handle_events(
             smoother,
             history_enabled,
@@ -73,33 +81,29 @@ def main() -> None:
         if not running:
             break
 
-        # Atualiza tela cheia se necessário
         is_currently_fullscreen = bool(screen.get_flags() & pygame.FULLSCREEN)
         if fullscreen != is_currently_fullscreen:
             screen, fullscreen = create_window(fullscreen)
 
-        # Gera gráfico 3D se solicitado
         if generate_3d:
             generate_3d_visualization(smoother)
 
-        # Atualiza indicador de mudança
         param_indicator.update(dt_ms)
 
-        # Captura posição do mouse
         mouse_x, mouse_y = pygame.mouse.get_pos()
+        mouse_x, mouse_y = tremor_sim.apply_tremor(mouse_x, mouse_y)
+        
         raw_point, ma_point, exp_point = smoother.add_sample(
             mouse_x,
             mouse_y,
             store_history=history_enabled,
         )
 
-        # Atualiza métricas
         current_fps = clock.get_fps()
         if current_fps > 0:
             metrics.add_fps(current_fps)
         metrics.add_latency(dt_ms)
 
-        # Renderiza frame
         render_frame(
             screen,
             font,
@@ -113,6 +117,7 @@ def main() -> None:
             metrics,
             param_indicator,
             fullscreen,
+            tremor_sim,
         )
 
         clock.tick(FPS)

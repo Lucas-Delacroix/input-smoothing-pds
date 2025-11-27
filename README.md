@@ -16,7 +16,11 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
    ```bash
    pip install -r requirements.txt
    ```
-3. Rode o app:
+3. (Opcional) Configure a simulação de tremor do mouse em `src/config.py`:
+   - `TREMOR_ENABLED`: `True` para ativar, `False` para desativar
+   - `TREMOR_INTENSITY`: intensidade do tremor em pixels (padrão: 5.0)
+   - `TREMOR_FREQUENCY`: frequência do tremor em Hz (padrão: 10.0)
+4. Rode o app:
    ```bash
    python3 src/main.py
    ```
@@ -41,13 +45,20 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
   - Cria dois arquivos: plot 3D do caminho e mapa de densidade 3D.
 
 ## O que você vê na tela
-- **Linha vermelha**: pontos brutos do mouse.
+- **Linha vermelha**: pontos brutos do mouse (com tremor aplicado se habilitado).
 - **Linha verde**: média móvel dos pontos.
 - **Linha azul**: suavização exponencial (IIR).
 - **Círculos**: indicam a posição atual de cada série.
-- **HUD**: mostra os parâmetros ativos, controles e estado de visibilidade.
+- **HUD**: mostra os parâmetros ativos, controles, estado de visibilidade e status do tremor.
 - **Gráfico de Métricas** (canto superior direito): mostra FPS e latência em tempo real.
 - **Indicador Visual**: aparece quando parâmetros são alterados.
+
+### Simulação de Tremor
+A aplicação inclui um simulador de tremor do mouse que adiciona ruído ao input para testar a eficácia dos filtros de suavização. O tremor combina:
+- **Oscilação senoidal**: movimento suave e periódico
+- **Ruído gaussiano**: tremor aleatório mais realista
+
+Configure o tremor em `src/config.py` antes de iniciar o programa. O status do tremor é exibido no HUD durante a execução.
 
 ### Gráficos 3D
 Ao pressionar `G`, são gerados dois gráficos 3D salvos na pasta `output/`:
@@ -60,4 +71,5 @@ Ao pressionar `G`, são gerados dois gráficos 3D salvos na pasta `output/`:
 - `src/ui_state.py`: classes para gerenciar estado da UI (zoom, pan, visibilidade, métricas).
 - `src/input_device.py`: estruturas de dados e filtros (média móvel e IIR) com buffers.
 - `src/filters.py`: funções puras de filtragem.
+- `src/tremor_simulator.py`: simulação de tremor no input do mouse.
 - `src/plot_3d.py`: geração de visualizações 3D usando matplotlib.

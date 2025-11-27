@@ -46,14 +46,12 @@ from ui_state import (
 from plot_3d import generate_3d_plot, generate_3d_surface_map
 
 
-# Estado global para pan (rastreamento de mouse)
 _pan_dragging = False
 _pan_start_pos = (0, 0)
 _pan_start_transform = ViewTransform()
 
 
 def create_window(fullscreen: bool = False) -> Tuple[pygame.Surface, bool]:
-    """Cria a janela. Retorna (screen, is_fullscreen)"""
     pygame.display.set_caption(TITLE)
     if fullscreen:
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -75,9 +73,6 @@ def handle_events(
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
 ) -> Tuple[bool, bool, bool, bool]:
-    """
-    Processa eventos. Retorna (running, history_enabled, fullscreen, generate_3d)
-    """
     global _pan_dragging, _pan_start_pos, _pan_start_transform
 
     for event in pygame.event.get():
@@ -96,15 +91,13 @@ def handle_events(
                 if generate_3d:
                     return True, history_enabled, fullscreen, True
 
-        # Zoom com mouse wheel
         if event.type == pygame.MOUSEWHEEL:
             zoom_delta = ZOOM_STEP * event.y
             new_zoom = max(ZOOM_MIN, min(ZOOM_MAX, view_transform.zoom + zoom_delta))
             view_transform.zoom = new_zoom
 
-        # Pan com mouse drag
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 2:  # Botão do meio
+            if event.button == 2:
                 _pan_dragging = True
                 _pan_start_pos = event.pos
                 _pan_start_transform.zoom = view_transform.zoom
@@ -134,9 +127,6 @@ def _handle_key(
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
 ) -> Optional[Tuple[bool, bool, bool]]:
-    """
-    Processa teclas. Retorna (history_enabled, fullscreen, generate_3d) ou None
-    """
     key_actions: dict[int, Callable[[InputSmoother], None]] = {
         pygame.K_UP: lambda sm: sm.change_window(1),
         pygame.K_DOWN: lambda sm: sm.change_window(-1),
@@ -155,7 +145,6 @@ def _handle_key(
             smoother.clear_history()
         return (not history_enabled, fullscreen, False)
 
-    # Toggle visibilidade
     if key == pygame.K_1:
         visibility.raw_visible = not visibility.raw_visible
         return None
@@ -166,16 +155,13 @@ def _handle_key(
         visibility.exp_visible = not visibility.exp_visible
         return None
 
-    # Fullscreen
     if key == pygame.K_F11:
         return (history_enabled, not fullscreen, False)
 
-    # Reset zoom/pan
     if key == pygame.K_r:
         view_transform.reset()
         return None
 
-    # Gerar gráfico 3D
     if key == pygame.K_g:
         return (history_enabled, fullscreen, True)
 
@@ -183,16 +169,12 @@ def _handle_key(
 
 
 def _apply_transform(point: Point, transform: ViewTransform, screen_width: int, screen_height: int) -> Tuple[int, int]:
-    """Aplica transformação de view a um ponto"""
-    # Centro da tela
     center_x = screen_width / 2
     center_y = screen_height / 2
 
-    # Aplica zoom relativo ao centro
     x = (point.x - center_x) * transform.zoom + center_x
     y = (point.y - center_y) * transform.zoom + center_y
 
-    # Aplica pan
     x += transform.pan_x
     y += transform.pan_y
 
@@ -205,7 +187,6 @@ def _draw_traces(
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    """Desenha os traços com transformação aplicada"""
     screen_width, screen_height = screen.get_size()
 
     if visibility.raw_visible and len(smoother.raw_trace) > 1:
@@ -256,7 +237,6 @@ def _draw_markers(
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    """Desenha marcadores com transformação aplicada"""
     screen_width, screen_height = screen.get_size()
 
     if visibility.raw_visible:
@@ -277,7 +257,6 @@ def _draw_metrics_graph(
     font: pygame.font.Font,
     metrics: MetricsTracker,
 ) -> None:
-    """Desenha gráfico de métricas (FPS e latência)"""
     if not metrics.fps_history or not metrics.latency_history:
         return
 
@@ -286,11 +265,9 @@ def _draw_metrics_graph(
     graph_w = METRICS_GRAPH_WIDTH
     graph_h = METRICS_GRAPH_HEIGHT
 
-    # Background do gráfico
     pygame.draw.rect(screen, (30, 30, 30), (graph_x, graph_y, graph_w, graph_h))
     pygame.draw.rect(screen, (100, 100, 100), (graph_x, graph_y, graph_w, graph_h), 1)
 
-    # Normaliza dados
     fps_data = list(metrics.fps_history)
     latency_data = list(metrics.latency_history)
 
@@ -305,7 +282,6 @@ def _draw_metrics_graph(
     latency_min = min(latency_data) if latency_data else 0
     latency_range = latency_max - latency_min if latency_max > latency_min else 1
 
-    # Desenha linha FPS (verde)
     if len(fps_data) > 1:
         points = []
         for i, fps in enumerate(fps_data):
@@ -315,7 +291,6 @@ def _draw_metrics_graph(
         if len(points) > 1:
             pygame.draw.lines(screen, (0, 255, 0), False, points, 2)
 
-    # Desenha linha Latência (amarelo)
     if len(latency_data) > 1:
         points = []
         for i, latency in enumerate(latency_data):
@@ -325,7 +300,6 @@ def _draw_metrics_graph(
         if len(points) > 1:
             pygame.draw.lines(screen, (255, 255, 0), False, points, 2)
 
-    # Labels
     label_text = f"FPS: {metrics.get_avg_fps():.1f} | Lat: {metrics.get_avg_latency():.1f}ms"
     label_surf = font.render(label_text, True, HUD_TEXT_COLOR)
     screen.blit(label_surf, (graph_x, graph_y - HUD_LINE_HEIGHT))
@@ -336,17 +310,14 @@ def _draw_param_change_indicator(
     font: pygame.font.Font,
     indicator: ParamChangeIndicator,
 ) -> None:
-    """Desenha indicador visual de mudança de parâmetros"""
     if indicator.active:
         alpha = min(255, int(255 * (indicator.timer / PARAM_CHANGE_INDICATOR_DURATION)))
         color = (*PARAM_CHANGE_COLOR, alpha)
         
-        # Cria superfície com alpha
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
         overlay.fill((255, 255, 0, alpha // 4))
         screen.blit(overlay, (0, 0))
 
-        # Texto
         text = "PARÂMETRO ALTERADO!"
         text_surf = font.render(text, True, PARAM_CHANGE_COLOR)
         text_rect = text_surf.get_rect(center=(screen.get_width() // 2, 50))
@@ -361,12 +332,14 @@ def _draw_hud(
     visibility: VisibilityState,
     transform: ViewTransform,
     fullscreen: bool,
+    tremor_sim,
 ) -> None:
-    """Desenha HUD com informações"""
     lines = [
         f"N (moving_average): {smoother.window_size}",
         f"IIR alpha (exp.smooth): {smoother.alpha:.2f}",
         f"Histórico (H): {'ON' if history_enabled else 'OFF'}",
+        f"Tremor: {'ON' if tremor_sim.enabled else 'OFF'} "
+        f"(Int: {tremor_sim.intensity:.1f}, Freq: {tremor_sim.frequency:.1f}Hz)",
         f"Zoom: {transform.zoom:.2f}x",
         f"Visibilidade:",
         f"  Raw (1): {'ON' if visibility.raw_visible else 'OFF'}",
@@ -388,7 +361,7 @@ def _draw_hud(
 
     x, y = HUD_MARGIN_X, HUD_MARGIN_Y
     for line in lines:
-        if line:  # Pula linhas vazias
+        if line:
             surf = font.render(line, True, HUD_TEXT_COLOR)
             screen.blit(surf, (x, y))
         y += HUD_LINE_HEIGHT
@@ -407,15 +380,15 @@ def render_frame(
     metrics: MetricsTracker,
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
+    tremor_sim,
 ) -> None:
-    """Renderiza um frame completo"""
     screen.fill(BACKGROUND_COLOR)
     
     if history_enabled:
         _draw_traces(screen, smoother, transform, visibility)
     
     _draw_markers(screen, raw_point, ma_point, exp_point, transform, visibility)
-    _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen)
+    _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim)
     _draw_metrics_graph(screen, font, metrics)
     _draw_param_change_indicator(screen, font, param_indicator)
     
@@ -423,7 +396,6 @@ def render_frame(
 
 
 def generate_3d_visualization(smoother: InputSmoother) -> None:
-    """Gera visualização 3D dos dados"""
     timestamp = int(time.time())
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)

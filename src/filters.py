@@ -2,10 +2,6 @@ from typing import Optional
 
 
 def moving_average(buffer: list[float], window_size: int) -> Optional[float]:
-    """
-    Retorna a média das últimas 'window_size' amostras do buffer.
-    Se o buffer estiver vazio, retorna None.
-    """
     if not buffer:
         return None
 
@@ -20,12 +16,6 @@ def moving_average(buffer: list[float], window_size: int) -> Optional[float]:
 def exp_smoothing(x: float,
                   prev_y: Optional[float],
                   alpha: float) -> float:
-    """
-    Filtro IIR de 1ª ordem (suavização exponencial):
-    y[n] = alpha * x[n] + (1 - alpha) * y[n-1]
-
-    Se prev_y for None, consideramos y[0] = x[0].
-    """
     if not (0.0 < alpha <= 1.0):
         raise ValueError("alpha deve estar em (0, 1].")
 
