@@ -19,6 +19,7 @@ from config import (
 )
 from input_device import InputSmoother
 from tremor_simulator import TremorSimulator
+from tremor_modal import TremorModal
 from ui import (
     build_font,
     create_window,
@@ -55,6 +56,8 @@ def main() -> None:
         frequency=TREMOR_FREQUENCY,
     )
 
+    tremor_modal = TremorModal(tremor_sim, font)
+
     history_enabled = DEFAULT_HISTORY_ENABLED
     view_transform = ViewTransform()
     visibility = VisibilityState()
@@ -69,17 +72,28 @@ def main() -> None:
         dt_ms = int((frame_start - last_time) * 1000)
         last_time = frame_start
 
-        running, history_enabled, fullscreen, generate_3d = handle_events(
-            smoother,
-            history_enabled,
-            view_transform,
-            visibility,
-            param_indicator,
-            fullscreen,
-        )
+        if tremor_modal.active:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    break
+                if event.type == pygame.KEYDOWN:
+                    tremor_modal.handle_key(event.key, event.mod)
+        else:
+            running, history_enabled, fullscreen, generate_3d, open_modal = handle_events(
+                smoother,
+                history_enabled,
+                view_transform,
+                visibility,
+                param_indicator,
+                fullscreen,
+            )
 
-        if not running:
-            break
+            if open_modal:
+                tremor_modal.open()
+
+            if not running:
+                break
 
         is_currently_fullscreen = bool(screen.get_flags() & pygame.FULLSCREEN)
         if fullscreen != is_currently_fullscreen:
@@ -118,6 +132,7 @@ def main() -> None:
             param_indicator,
             fullscreen,
             tremor_sim,
+            tremor_modal,
         )
 
         clock.tick(FPS)

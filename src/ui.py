@@ -72,16 +72,18 @@ def handle_events(
     visibility: VisibilityState,
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
-) -> Tuple[bool, bool, bool, bool]:
+) -> Tuple[bool, bool, bool, bool, bool]:
     global _pan_dragging, _pan_start_pos, _pan_start_transform
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            return False, history_enabled, fullscreen, False
+            return False, history_enabled, fullscreen, False, False
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 return False, history_enabled, fullscreen, False
+            if event.key == pygame.K_SPACE and (event.mod & pygame.KMOD_CTRL):
+                return True, history_enabled, fullscreen, False, True
             result = _handle_key(
                 event.key, smoother, history_enabled, view_transform,
                 visibility, param_indicator, fullscreen
@@ -115,7 +117,7 @@ def handle_events(
                 view_transform.pan_x = _pan_start_transform.pan_x + dx
                 view_transform.pan_y = _pan_start_transform.pan_y + dy
 
-    return True, history_enabled, fullscreen, False
+    return True, history_enabled, fullscreen, False, False
 
 
 def _handle_key(
@@ -356,6 +358,7 @@ def _draw_hud(
         "  R            -> reset zoom/pan",
         "  F11          -> tela cheia",
         "  G            -> gerar gráfico 3D",
+        "  CTRL+SPACE    -> configurar tremor",
         "  ESC          -> sair",
     ]
 
@@ -381,6 +384,7 @@ def render_frame(
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
     tremor_sim,
+    tremor_modal=None,
 ) -> None:
     screen.fill(BACKGROUND_COLOR)
     
@@ -391,6 +395,9 @@ def render_frame(
     _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim)
     _draw_metrics_graph(screen, font, metrics)
     _draw_param_change_indicator(screen, font, param_indicator)
+    
+    if tremor_modal:
+        tremor_modal.render(screen)
     
     pygame.display.flip()
 
