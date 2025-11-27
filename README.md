@@ -1,5 +1,5 @@
 # Input Smoothing PDS
-
+![alt text](docs/image.png)
 Visualizador em tempo real de suavização de entrada (mouse) usando média móvel e suavização exponencial (IIR). Permite ajustar parâmetros no teclado e ligar/desligar o histórico para observar o efeito dos filtros.
 
 ## Pré-requisitos
