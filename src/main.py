@@ -1,95 +1,182 @@
 import sys
+from typing import Optional
+
 import pygame
-from filters import moving_average, exp_smoothing
 
-def config_window():
-    width, height = 800, 600
-    screen = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Realtime Input Smoothing - PDS")
-    return screen
+from config import (
+    ALPHA_MAX,
+    ALPHA_MIN,
+    ALPHA_STEP,
+    BACKGROUND_COLOR,
+    CURSOR_EXP_COLOR,
+    CURSOR_MA_COLOR,
+    CURSOR_RAW_COLOR,
+    DEFAULT_IIR_ALPHA,
+    DEFAULT_MOVING_AVERAGE_WINDOW,
+    EXP_COLOR,
+    FPS,
+    HUD_FONT,
+    HUD_FONT_SIZE,
+    HUD_LINE_HEIGHT,
+    HUD_MARGIN_X,
+    HUD_MARGIN_Y,
+    HUD_TEXT_COLOR,
+    MARKER_RADIUS,
+    MAX_BUFFER,
+    MOVING_AVERAGE_COLOR,
+    MOVING_AVERAGE_MIN,
+    RAW_COLOR,
+    RAW_LINE_WIDTH,
+    SMOOTH_LINE_WIDTH,
+    TITLE,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
+)
+from input_device import InputSmoother, Point
 
-def draw_hud(screen: pygame.Surface, n_moving_average: int, IIR_factor: float) -> None:
-    font = pygame.font.SysFont("consolas", 20)
 
+def create_window() -> pygame.Surface:
+    pygame.display.set_caption(TITLE)
+    return pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+
+
+def build_font() -> pygame.font.Font:
+    return pygame.font.SysFont(HUD_FONT, HUD_FONT_SIZE)
+
+
+def handle_events(smoother: InputSmoother) -> bool:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            return False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                return False
+            handle_key(event.key, smoother)
+
+    return True
+
+
+def handle_key(key: int, smoother: InputSmoother) -> None:
+    if key == pygame.K_UP:
+        smoother.change_window(1)
+    elif key == pygame.K_DOWN:
+        smoother.change_window(-1)
+    elif key == pygame.K_RIGHT:
+        smoother.change_alpha(ALPHA_STEP)
+    elif key == pygame.K_LEFT:
+        smoother.change_alpha(-ALPHA_STEP)
+
+
+def draw_traces(screen: pygame.Surface, smoother: InputSmoother) -> None:
+    if len(smoother.raw_trace) > 1:
+        pygame.draw.lines(
+            screen,
+            RAW_COLOR,
+            False,
+            smoother.raw_trace.as_int_tuples(),
+            RAW_LINE_WIDTH,
+        )
+
+    if len(smoother.moving_average_trace) > 1:
+        pygame.draw.lines(
+            screen,
+            MOVING_AVERAGE_COLOR,
+            False,
+            smoother.moving_average_trace.as_int_tuples(),
+            SMOOTH_LINE_WIDTH,
+        )
+
+    if len(smoother.exp_trace) > 1:
+        pygame.draw.lines(
+            screen,
+            EXP_COLOR,
+            False,
+            smoother.exp_trace.as_int_tuples(),
+            SMOOTH_LINE_WIDTH,
+        )
+
+
+def draw_markers(
+    screen: pygame.Surface,
+    raw_point: Point,
+    ma_point: Optional[Point],
+    exp_point: Point,
+) -> None:
+    pygame.draw.circle(screen, CURSOR_RAW_COLOR, raw_point.as_int_tuple(), MARKER_RADIUS)
+
+    if ma_point is not None:
+        pygame.draw.circle(
+            screen,
+            CURSOR_MA_COLOR,
+            ma_point.as_int_tuple(),
+            MARKER_RADIUS,
+        )
+
+    pygame.draw.circle(screen, CURSOR_EXP_COLOR, exp_point.as_int_tuple(), MARKER_RADIUS)
+
+
+def draw_hud(screen: pygame.Surface, font: pygame.font.Font, smoother: InputSmoother) -> None:
     lines = [
-        f"N (moving_average): {n_moving_average}",
-        f"IIR_factor (exp.smooth): {IIR_factor:.2f}",
+        f"N (moving_average): {smoother.window_size}",
+        f"IIR alpha (exp.smooth): {smoother.alpha:.2f}",
         "Controles:",
-        "  ↑ / ↓  -> aumenta/diminui N",
-        "  → / ←  -> aumenta/diminui IIR_factor",
-        "  ESC    -> sair",
+        "  UP / DOWN    -> aumenta/diminui N",
+        "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
+        "  ESC          -> sair",
     ]
 
-    x, y = 10, 10
+    x, y = HUD_MARGIN_X, HUD_MARGIN_Y
     for line in lines:
-        surf = font.render(line, True, (230, 230, 230))
+        surf = font.render(line, True, HUD_TEXT_COLOR)
         screen.blit(surf, (x, y))
-        y += 22
+        y += HUD_LINE_HEIGHT
 
-def main():
+
+def render_frame(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    smoother: InputSmoother,
+    raw_point: Point,
+    ma_point: Optional[Point],
+    exp_point: Point,
+) -> None:
+    screen.fill(BACKGROUND_COLOR)
+    draw_traces(screen, smoother)
+    draw_markers(screen, raw_point, ma_point, exp_point)
+    draw_hud(screen, font, smoother)
+    pygame.display.flip()
+
+
+def main() -> None:
     pygame.init()
-    screen = config_window()
+    screen = create_window()
     clock = pygame.time.Clock()
+    font = build_font()
 
-    n_moving_average = 5
-    IIR_factor = 0.4
-    raw_x = []
-    raw_y = []
-    exp_x = None
-    exp_y = None
-
-
+    smoother = InputSmoother(
+        buffer_size=MAX_BUFFER,
+        window_size=DEFAULT_MOVING_AVERAGE_WINDOW,
+        alpha=DEFAULT_IIR_ALPHA,
+        min_window=MOVING_AVERAGE_MIN,
+        min_alpha=ALPHA_MIN,
+        max_alpha=ALPHA_MAX,
+    )
 
     running = True
     while running:
-        for event in pygame.event.get():
-            
-            if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif event.key == pygame.K_UP:
-                    n_moving_average += 1
-                elif event.key == pygame.K_DOWN:
-                    n_moving_average = max(1, n_moving_average - 1)
-                elif event.key == pygame.K_RIGHT:
-                    IIR_factor = min(1.0, IIR_factor + 0.05)
-                elif event.key == pygame.K_LEFT:
-                    IIR_factor = max(0.05, IIR_factor - 0.05)
-
+        running = handle_events(smoother)
+        if not running:
+            break
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
-        raw_x.append(mouse_x)
-        raw_y.append(mouse_y)
+        raw_point, ma_point, exp_point = smoother.add_sample(mouse_x, mouse_y)
 
-
-        ma_x = moving_average(raw_x, n_moving_average)
-        ma_y = moving_average(raw_y, n_moving_average)
-
-        exp_x = exp_smoothing(mouse_x, exp_x, IIR_factor)
-        exp_y = exp_smoothing(mouse_y, exp_y, IIR_factor)
-
-        screen.fill((10, 10, 10))
-
-        pygame.draw.circle(screen, (200, 50, 50), (mouse_x, mouse_y), 6)
-
-        if ma_x is not None and ma_y is not None:
-            pygame.draw.circle(screen, (50, 200, 50), (int(ma_x), int(ma_y)), 6)
-
-        pygame.draw.circle(screen, (50, 100, 220), (int(exp_x), int(exp_y)), 6)
-
-        draw_hud(screen, n_moving_average, IIR_factor)
-
-        pygame.display.flip()
-        clock.tick(60)
+        render_frame(screen, font, smoother, raw_point, ma_point, exp_point)
+        clock.tick(FPS)
 
     pygame.quit()
     sys.exit()
-
-
-
 
 
 if __name__ == "__main__":
