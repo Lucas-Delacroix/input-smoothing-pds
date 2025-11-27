@@ -18,12 +18,7 @@ from config import (
     HUD_MARGIN_Y,
     HUD_TEXT_COLOR,
     MARKER_RADIUS,
-    METRICS_GRAPH_HEIGHT,
-    METRICS_GRAPH_WIDTH,
-    METRICS_GRAPH_X,
-    METRICS_GRAPH_Y,
     MOVING_AVERAGE_COLOR,
-    PAN_SENSITIVITY,
     PARAM_CHANGE_COLOR,
     PARAM_CHANGE_INDICATOR_DURATION,
     RAW_COLOR,
@@ -32,9 +27,6 @@ from config import (
     TITLE,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
-    ZOOM_MAX,
-    ZOOM_MIN,
-    ZOOM_STEP,
 )
 from input_device import InputSmoother, Point
 from ui_state import (
@@ -46,9 +38,6 @@ from ui_state import (
 from plot_3d import generate_3d_plot, generate_3d_surface_map
 
 
-_pan_dragging = False
-_pan_start_pos = (0, 0)
-_pan_start_transform = ViewTransform()
 
 
 def create_window(fullscreen: bool = False) -> Tuple[pygame.Surface, bool]:
@@ -73,15 +62,13 @@ def handle_events(
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
 ) -> Tuple[bool, bool, bool, bool, bool]:
-    global _pan_dragging, _pan_start_pos, _pan_start_transform
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False, history_enabled, fullscreen, False, False
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                return False, history_enabled, fullscreen, False
+                return False, history_enabled, fullscreen, False, False
             if event.key == pygame.K_SPACE and (event.mod & pygame.KMOD_CTRL):
                 return True, history_enabled, fullscreen, False, True
             result = _handle_key(
@@ -91,31 +78,8 @@ def handle_events(
             if result is not None:
                 history_enabled, fullscreen, generate_3d = result
                 if generate_3d:
-                    return True, history_enabled, fullscreen, True
+                    return True, history_enabled, fullscreen, True, False
 
-        if event.type == pygame.MOUSEWHEEL:
-            zoom_delta = ZOOM_STEP * event.y
-            new_zoom = max(ZOOM_MIN, min(ZOOM_MAX, view_transform.zoom + zoom_delta))
-            view_transform.zoom = new_zoom
-
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 2:
-                _pan_dragging = True
-                _pan_start_pos = event.pos
-                _pan_start_transform.zoom = view_transform.zoom
-                _pan_start_transform.pan_x = view_transform.pan_x
-                _pan_start_transform.pan_y = view_transform.pan_y
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 2:
-                _pan_dragging = False
-
-        if event.type == pygame.MOUSEMOTION:
-            if _pan_dragging:
-                dx = (event.pos[0] - _pan_start_pos[0]) * PAN_SENSITIVITY
-                dy = (event.pos[1] - _pan_start_pos[1]) * PAN_SENSITIVITY
-                view_transform.pan_x = _pan_start_transform.pan_x + dx
-                view_transform.pan_y = _pan_start_transform.pan_y + dy
 
     return True, history_enabled, fullscreen, False, False
 
@@ -160,27 +124,11 @@ def _handle_key(
     if key == pygame.K_F11:
         return (history_enabled, not fullscreen, False)
 
-    if key == pygame.K_r:
-        view_transform.reset()
-        return None
 
     if key == pygame.K_g:
         return (history_enabled, fullscreen, True)
 
     return None
-
-
-def _apply_transform(point: Point, transform: ViewTransform, screen_width: int, screen_height: int) -> Tuple[int, int]:
-    center_x = screen_width / 2
-    center_y = screen_height / 2
-
-    x = (point.x - center_x) * transform.zoom + center_x
-    y = (point.y - center_y) * transform.zoom + center_y
-
-    x += transform.pan_x
-    y += transform.pan_y
-
-    return int(x), int(y)
 
 
 def _draw_traces(
@@ -189,44 +137,33 @@ def _draw_traces(
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    screen_width, screen_height = screen.get_size()
-
     if visibility.raw_visible and len(smoother.raw_trace) > 1:
-        transformed_points = [
-            _apply_transform(p, transform, screen_width, screen_height)
-            for p in smoother.raw_trace
-        ]
+        points = smoother.raw_trace.as_int_tuples()
         pygame.draw.lines(
             screen,
             RAW_COLOR,
             False,
-            transformed_points,
+            points,
             RAW_LINE_WIDTH,
         )
 
     if visibility.ma_visible and len(smoother.moving_average_trace) > 1:
-        transformed_points = [
-            _apply_transform(p, transform, screen_width, screen_height)
-            for p in smoother.moving_average_trace
-        ]
+        points = smoother.moving_average_trace.as_int_tuples()
         pygame.draw.lines(
             screen,
             MOVING_AVERAGE_COLOR,
             False,
-            transformed_points,
+            points,
             SMOOTH_LINE_WIDTH,
         )
 
     if visibility.exp_visible and len(smoother.exp_trace) > 1:
-        transformed_points = [
-            _apply_transform(p, transform, screen_width, screen_height)
-            for p in smoother.exp_trace
-        ]
+        points = smoother.exp_trace.as_int_tuples()
         pygame.draw.lines(
             screen,
             EXP_COLOR,
             False,
-            transformed_points,
+            points,
             SMOOTH_LINE_WIDTH,
         )
 
@@ -239,72 +176,19 @@ def _draw_markers(
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    screen_width, screen_height = screen.get_size()
-
     if visibility.raw_visible:
-        x, y = _apply_transform(raw_point, transform, screen_width, screen_height)
+        x, y = raw_point.as_int_tuple()
         pygame.draw.circle(screen, CURSOR_RAW_COLOR, (x, y), MARKER_RADIUS)
 
     if visibility.ma_visible and ma_point is not None:
-        x, y = _apply_transform(ma_point, transform, screen_width, screen_height)
+        x, y = ma_point.as_int_tuple()
         pygame.draw.circle(screen, CURSOR_MA_COLOR, (x, y), MARKER_RADIUS)
 
     if visibility.exp_visible:
-        x, y = _apply_transform(exp_point, transform, screen_width, screen_height)
+        x, y = exp_point.as_int_tuple()
         pygame.draw.circle(screen, CURSOR_EXP_COLOR, (x, y), MARKER_RADIUS)
 
 
-def _draw_metrics_graph(
-    screen: pygame.Surface,
-    font: pygame.font.Font,
-    metrics: MetricsTracker,
-) -> None:
-    if not metrics.fps_history or not metrics.latency_history:
-        return
-
-    graph_x = METRICS_GRAPH_X
-    graph_y = METRICS_GRAPH_Y
-    graph_w = METRICS_GRAPH_WIDTH
-    graph_h = METRICS_GRAPH_HEIGHT
-
-    pygame.draw.rect(screen, (30, 30, 30), (graph_x, graph_y, graph_w, graph_h))
-    pygame.draw.rect(screen, (100, 100, 100), (graph_x, graph_y, graph_w, graph_h), 1)
-
-    fps_data = list(metrics.fps_history)
-    latency_data = list(metrics.latency_history)
-
-    if not fps_data or not latency_data:
-        return
-
-    fps_max = max(fps_data) if fps_data else 60
-    fps_min = min(fps_data) if fps_data else 0
-    fps_range = fps_max - fps_min if fps_max > fps_min else 1
-
-    latency_max = max(latency_data) if latency_data else 20
-    latency_min = min(latency_data) if latency_data else 0
-    latency_range = latency_max - latency_min if latency_max > latency_min else 1
-
-    if len(fps_data) > 1:
-        points = []
-        for i, fps in enumerate(fps_data):
-            x = graph_x + int((i / (len(fps_data) - 1)) * graph_w)
-            y = graph_y + graph_h - int(((fps - fps_min) / fps_range) * graph_h)
-            points.append((x, y))
-        if len(points) > 1:
-            pygame.draw.lines(screen, (0, 255, 0), False, points, 2)
-
-    if len(latency_data) > 1:
-        points = []
-        for i, latency in enumerate(latency_data):
-            x = graph_x + int((i / (len(latency_data) - 1)) * graph_w)
-            y = graph_y + graph_h - int(((latency - latency_min) / latency_range) * graph_h)
-            points.append((x, y))
-        if len(points) > 1:
-            pygame.draw.lines(screen, (255, 255, 0), False, points, 2)
-
-    label_text = f"FPS: {metrics.get_avg_fps():.1f} | Lat: {metrics.get_avg_latency():.1f}ms"
-    label_surf = font.render(label_text, True, HUD_TEXT_COLOR)
-    screen.blit(label_surf, (graph_x, graph_y - HUD_LINE_HEIGHT))
 
 
 def _draw_param_change_indicator(
@@ -342,7 +226,6 @@ def _draw_hud(
         f"Histórico (H): {'ON' if history_enabled else 'OFF'}",
         f"Tremor: {'ON' if tremor_sim.enabled else 'OFF'} "
         f"(Int: {tremor_sim.intensity:.1f}, Freq: {tremor_sim.frequency:.1f}Hz)",
-        f"Zoom: {transform.zoom:.2f}x",
         f"Visibilidade:",
         f"  Raw (1): {'ON' if visibility.raw_visible else 'OFF'}",
         f"  MA (2): {'ON' if visibility.ma_visible else 'OFF'}",
@@ -353,9 +236,6 @@ def _draw_hud(
         "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
         "  H            -> liga/desliga histórico",
         "  1, 2, 3      -> toggle visibilidade",
-        "  Scroll       -> zoom in/out",
-        "  Botão Meio   -> pan (arrastar)",
-        "  R            -> reset zoom/pan",
         "  F11          -> tela cheia",
         "  G            -> gerar gráfico 3D",
         "  CTRL+SPACE    -> configurar tremor",
@@ -393,7 +273,6 @@ def render_frame(
     
     _draw_markers(screen, raw_point, ma_point, exp_point, transform, visibility)
     _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim)
-    _draw_metrics_graph(screen, font, metrics)
     _draw_param_change_indicator(screen, font, param_indicator)
     
     if tremor_modal:

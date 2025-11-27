@@ -16,6 +16,7 @@ from config import (
 @dataclass
 class ViewTransform:
     zoom: float = ZOOM_DEFAULT
+    target_zoom: float = ZOOM_DEFAULT
     pan_x: float = 0.0
     pan_y: float = 0.0
 
@@ -24,8 +25,15 @@ class ViewTransform:
 
     def reset(self) -> None:
         self.zoom = ZOOM_DEFAULT
+        self.target_zoom = ZOOM_DEFAULT
         self.pan_x = 0.0
         self.pan_y = 0.0
+
+    def update_smooth(self, factor: float) -> None:
+        diff = self.target_zoom - self.zoom
+        self.zoom += diff * factor
+        if abs(diff) < 0.001:
+            self.zoom = self.target_zoom
 
 
 @dataclass

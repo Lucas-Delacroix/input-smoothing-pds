@@ -79,6 +79,13 @@ def main() -> None:
                     break
                 if event.type == pygame.KEYDOWN:
                     tremor_modal.handle_key(event.key, event.mod)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    tremor_modal.handle_mouse(event.pos, event.button, True)
+                if event.type == pygame.MOUSEBUTTONUP:
+                    tremor_modal.handle_mouse(event.pos, event.button, False)
+                if event.type == pygame.MOUSEMOTION:
+                    if tremor_modal.slider_dragging:
+                        tremor_modal.handle_mouse(event.pos, 0, True)
         else:
             running, history_enabled, fullscreen, generate_3d, open_modal = handle_events(
                 smoother,
