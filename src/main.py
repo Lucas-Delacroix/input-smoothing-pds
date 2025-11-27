@@ -16,7 +16,6 @@ from config import (
     TREMOR_ENABLED,
     TREMOR_INTENSITY,
     TREMOR_FREQUENCY,
-    ZOOM_SMOOTH_FACTOR,
 )
 from input_device import InputSmoother
 from tremor_simulator import TremorSimulator
@@ -111,7 +110,6 @@ def main() -> None:
             generate_3d_visualization(smoother)
 
         param_indicator.update(dt_ms)
-        view_transform.update_smooth(ZOOM_SMOOTH_FACTOR)
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x, mouse_y = tremor_sim.apply_tremor(mouse_x, mouse_y)
