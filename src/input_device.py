@@ -116,6 +116,8 @@ class InputSmoother:
         self.raw_trace.clear()
         self.moving_average_trace.clear()
         self.exp_trace.clear()
+        self._sample_buffer.clear()
+        self._exp_point = None
 
     @property
     def window_size(self) -> int:

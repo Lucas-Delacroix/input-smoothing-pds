@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 import pygame
 
@@ -50,18 +50,23 @@ def handle_events(smoother: InputSmoother, history_enabled: bool) -> tuple[bool,
 
 
 def _handle_key(key: int, smoother: InputSmoother, history_enabled: bool) -> bool:
-    if key == pygame.K_UP:
-        smoother.change_window(1)
-    elif key == pygame.K_DOWN:
-        smoother.change_window(-1)
-    elif key == pygame.K_RIGHT:
-        smoother.change_alpha(ALPHA_STEP)
-    elif key == pygame.K_LEFT:
-        smoother.change_alpha(-ALPHA_STEP)
-    elif key == pygame.K_h:
+    key_actions: dict[int, Callable[[InputSmoother], None]] = {
+        pygame.K_UP: lambda sm: sm.change_window(1),
+        pygame.K_DOWN: lambda sm: sm.change_window(-1),
+        pygame.K_RIGHT: lambda sm: sm.change_alpha(ALPHA_STEP),
+        pygame.K_LEFT: lambda sm: sm.change_alpha(-ALPHA_STEP),
+    }
+
+    action = key_actions.get(key)
+    if action:
+        action(smoother)
+        return history_enabled
+
+    if key == pygame.K_h:
         if history_enabled:
             smoother.clear_history()
         return not history_enabled
+
     return history_enabled
 
 
