@@ -16,6 +16,7 @@ from config import (
     TREMOR_ENABLED,
     TREMOR_INTENSITY,
     TREMOR_FREQUENCY,
+    ZOOM_SMOOTH_FACTOR,
 )
 from input_device import InputSmoother
 from tremor_simulator import TremorSimulator
@@ -79,6 +80,13 @@ def main() -> None:
                     break
                 if event.type == pygame.KEYDOWN:
                     tremor_modal.handle_key(event.key, event.mod)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    tremor_modal.handle_mouse(event.pos, event.button, True)
+                if event.type == pygame.MOUSEBUTTONUP:
+                    tremor_modal.handle_mouse(event.pos, event.button, False)
+                if event.type == pygame.MOUSEMOTION:
+                    if tremor_modal.slider_dragging:
+                        tremor_modal.handle_mouse(event.pos, 0, True)
         else:
             running, history_enabled, fullscreen, generate_3d, open_modal = handle_events(
                 smoother,
@@ -103,6 +111,7 @@ def main() -> None:
             generate_3d_visualization(smoother)
 
         param_indicator.update(dt_ms)
+        view_transform.update_smooth(ZOOM_SMOOTH_FACTOR)
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x, mouse_y = tremor_sim.apply_tremor(mouse_x, mouse_y)

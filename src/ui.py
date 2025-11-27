@@ -34,7 +34,9 @@ from config import (
     WINDOW_WIDTH,
     ZOOM_MAX,
     ZOOM_MIN,
+    ZOOM_SMOOTH_FACTOR,
     ZOOM_STEP,
+    ZOOM_TO_MOUSE,
 )
 from input_device import InputSmoother, Point
 from ui_state import (
@@ -81,7 +83,7 @@ def handle_events(
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                return False, history_enabled, fullscreen, False
+                return False, history_enabled, fullscreen, False, False
             if event.key == pygame.K_SPACE and (event.mod & pygame.KMOD_CTRL):
                 return True, history_enabled, fullscreen, False, True
             result = _handle_key(
@@ -91,12 +93,21 @@ def handle_events(
             if result is not None:
                 history_enabled, fullscreen, generate_3d = result
                 if generate_3d:
-                    return True, history_enabled, fullscreen, True
+                    return True, history_enabled, fullscreen, True, False
 
         if event.type == pygame.MOUSEWHEEL:
             zoom_delta = ZOOM_STEP * event.y
-            new_zoom = max(ZOOM_MIN, min(ZOOM_MAX, view_transform.zoom + zoom_delta))
-            view_transform.zoom = new_zoom
+            old_zoom = view_transform.target_zoom
+            new_zoom = max(ZOOM_MIN, min(ZOOM_MAX, old_zoom + zoom_delta))
+            view_transform.target_zoom = new_zoom
+            
+            if ZOOM_TO_MOUSE:
+                mouse_x, mouse_y = event.pos
+                screen_width, screen_height = pygame.display.get_surface().get_size()
+                world_x = (mouse_x - view_transform.pan_x - screen_width / 2) / old_zoom + screen_width / 2
+                world_y = (mouse_y - view_transform.pan_y - screen_height / 2) / old_zoom + screen_height / 2
+                view_transform.pan_x = mouse_x - world_x * new_zoom
+                view_transform.pan_y = mouse_y - world_y * new_zoom
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 2:
