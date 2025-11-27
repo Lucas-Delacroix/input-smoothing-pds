@@ -36,20 +36,20 @@ def build_font() -> pygame.font.Font:
     return pygame.font.SysFont(HUD_FONT, HUD_FONT_SIZE)
 
 
-def handle_events(smoother: InputSmoother) -> bool:
+def handle_events(smoother: InputSmoother, history_enabled: bool) -> tuple[bool, bool]:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            return False
+            return False, history_enabled
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                return False
-            _handle_key(event.key, smoother)
+                return False, history_enabled
+            history_enabled = _handle_key(event.key, smoother, history_enabled)
 
-    return True
+    return True, history_enabled
 
 
-def _handle_key(key: int, smoother: InputSmoother) -> None:
+def _handle_key(key: int, smoother: InputSmoother, history_enabled: bool) -> bool:
     if key == pygame.K_UP:
         smoother.change_window(1)
     elif key == pygame.K_DOWN:
@@ -58,6 +58,11 @@ def _handle_key(key: int, smoother: InputSmoother) -> None:
         smoother.change_alpha(ALPHA_STEP)
     elif key == pygame.K_LEFT:
         smoother.change_alpha(-ALPHA_STEP)
+    elif key == pygame.K_h:
+        if history_enabled:
+            smoother.clear_history()
+        return not history_enabled
+    return history_enabled
 
 
 def _draw_traces(screen: pygame.Surface, smoother: InputSmoother) -> None:
@@ -108,13 +113,20 @@ def _draw_markers(
     pygame.draw.circle(screen, CURSOR_EXP_COLOR, exp_point.as_int_tuple(), MARKER_RADIUS)
 
 
-def _draw_hud(screen: pygame.Surface, font: pygame.font.Font, smoother: InputSmoother) -> None:
+def _draw_hud(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    smoother: InputSmoother,
+    history_enabled: bool,
+) -> None:
     lines = [
         f"N (moving_average): {smoother.window_size}",
         f"IIR alpha (exp.smooth): {smoother.alpha:.2f}",
+        f"Histórico (H): {'ON' if history_enabled else 'OFF'}",
         "Controles:",
         "  UP / DOWN    -> aumenta/diminui N",
         "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
+        "  H            -> liga/desliga histórico",
         "  ESC          -> sair",
     ]
 
@@ -129,12 +141,14 @@ def render_frame(
     screen: pygame.Surface,
     font: pygame.font.Font,
     smoother: InputSmoother,
+    history_enabled: bool,
     raw_point: Point,
     ma_point: Optional[Point],
     exp_point: Point,
 ) -> None:
     screen.fill(BACKGROUND_COLOR)
-    _draw_traces(screen, smoother)
+    if history_enabled:
+        _draw_traces(screen, smoother)
     _draw_markers(screen, raw_point, ma_point, exp_point)
-    _draw_hud(screen, font, smoother)
+    _draw_hud(screen, font, smoother, history_enabled)
     pygame.display.flip()

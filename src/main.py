@@ -5,6 +5,7 @@ import pygame
 from config import (
     ALPHA_MAX,
     ALPHA_MIN,
+    DEFAULT_HISTORY_ENABLED,
     DEFAULT_IIR_ALPHA,
     DEFAULT_MOVING_AVERAGE_WINDOW,
     FPS,
@@ -30,16 +31,29 @@ def main() -> None:
         max_alpha=ALPHA_MAX,
     )
 
+    history_enabled = DEFAULT_HISTORY_ENABLED
     running = True
     while running:
-        running = handle_events(smoother)
+        running, history_enabled = handle_events(smoother, history_enabled)
         if not running:
             break
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
-        raw_point, ma_point, exp_point = smoother.add_sample(mouse_x, mouse_y)
+        raw_point, ma_point, exp_point = smoother.add_sample(
+            mouse_x,
+            mouse_y,
+            store_history=history_enabled,
+        )
 
-        render_frame(screen, font, smoother, raw_point, ma_point, exp_point)
+        render_frame(
+            screen,
+            font,
+            smoother,
+            history_enabled,
+            raw_point,
+            ma_point,
+            exp_point,
+        )
         clock.tick(FPS)
 
     pygame.quit()

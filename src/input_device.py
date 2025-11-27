@@ -27,6 +27,9 @@ class TraceBuffer:
     def latest(self) -> Optional[Point]:
         return self._points[-1] if self._points else None
 
+    def clear(self) -> None:
+        self._points.clear()
+
     def __len__(self) -> int:
         return len(self._points)
 
@@ -50,33 +53,49 @@ class InputSmoother:
         self._min_alpha = min_alpha
         self._max_alpha = max_alpha
 
+        self._sample_buffer: Deque[Point] = deque(maxlen=buffer_size)
         self.raw_trace = TraceBuffer(buffer_size)
         self.moving_average_trace = TraceBuffer(buffer_size)
         self.exp_trace = TraceBuffer(buffer_size)
 
         self._exp_point: Optional[Point] = None
 
-    def add_sample(self, x: float, y: float) -> tuple[Point, Optional[Point], Point]:
+    def add_sample(
+        self,
+        x: float,
+        y: float,
+        store_history: bool = True,
+    ) -> tuple[Point, Optional[Point], Point]:
         point = Point(x, y)
-        self.raw_trace.append(point)
+        self._sample_buffer.append(point)
 
-        ma_point = self._append_moving_average()
-        exp_point = self._append_exponential(point)
+        ma_point = self._compute_moving_average()
+        exp_point = self._compute_exponential(point)
+
+        if store_history:
+            self.raw_trace.append(point)
+            if ma_point is not None:
+                self.moving_average_trace.append(ma_point)
+            self.exp_trace.append(exp_point)
 
         return point, ma_point, exp_point
 
-    def _append_moving_average(self) -> Optional[Point]:
-        ma_x = moving_average([p.x for p in self.raw_trace], self._window_size)
-        ma_y = moving_average([p.y for p in self.raw_trace], self._window_size)
+    def _compute_moving_average(self) -> Optional[Point]:
+        if not self._sample_buffer:
+            return None
+
+        sample_x = [p.x for p in self._sample_buffer]
+        sample_y = [p.y for p in self._sample_buffer]
+        ma_x = moving_average(sample_x, self._window_size)
+        ma_y = moving_average(sample_y, self._window_size)
 
         if ma_x is None or ma_y is None:
             return None
 
         ma_point = Point(ma_x, ma_y)
-        self.moving_average_trace.append(ma_point)
         return ma_point
 
-    def _append_exponential(self, point: Point) -> Point:
+    def _compute_exponential(self, point: Point) -> Point:
         prev_x = self._exp_point.x if self._exp_point else None
         prev_y = self._exp_point.y if self._exp_point else None
 
@@ -85,7 +104,6 @@ class InputSmoother:
             exp_smoothing(point.y, prev_y, self._alpha),
         )
 
-        self.exp_trace.append(self._exp_point)
         return self._exp_point
 
     def change_window(self, delta: int) -> None:
@@ -93,6 +111,11 @@ class InputSmoother:
 
     def change_alpha(self, delta: float) -> None:
         self._alpha = self._clamp(self._alpha + delta, self._min_alpha, self._max_alpha)
+
+    def clear_history(self) -> None:
+        self.raw_trace.clear()
+        self.moving_average_trace.clear()
+        self.exp_trace.clear()
 
     @property
     def window_size(self) -> int:
