@@ -50,3 +50,64 @@ class TremorSimulator:
     def set_frequency(self, frequency: float) -> None:
         self.frequency = max(0.1, frequency)
 
+
+class DriftSimulator:
+    def __init__(
+        self,
+        enabled: bool = False,
+        pixels_per_second: float = 25.0,
+        direction_deg: float = 0.0,
+    ):
+        self.enabled = enabled
+        self.pixels_per_second = max(0.0, pixels_per_second)
+        self.direction_deg = direction_deg
+        self._direction_rad = math.radians(direction_deg)
+        self._last_update: float | None = None
+        self._offset_x = 0.0
+        self._offset_y = 0.0
+
+    def apply_drift(self, x: float, y: float) -> Tuple[float, float]:
+        if not self.enabled or self.pixels_per_second <= 0.0:
+            self._reset_clock()
+            self._offset_x = 0.0
+            self._offset_y = 0.0
+            return x, y
+
+        now = time.time()
+        if self._last_update is None:
+            self._last_update = now
+            return x + self._offset_x, y + self._offset_y
+
+        elapsed = now - self._last_update
+        self._last_update = now
+
+        drift_x = math.cos(self._direction_rad) * self.pixels_per_second * elapsed
+        drift_y = math.sin(self._direction_rad) * self.pixels_per_second * elapsed
+
+        self._offset_x += drift_x
+        self._offset_y += drift_y
+
+        return x + self._offset_x, y + self._offset_y
+
+    def set_enabled(self, enabled: bool) -> None:
+        self.enabled = enabled
+        if enabled:
+            self._reset_clock()
+        else:
+            self.reset()
+
+    def set_speed(self, pixels_per_second: float) -> None:
+        self.pixels_per_second = max(0.0, pixels_per_second)
+
+    def set_direction(self, direction_deg: float) -> None:
+        self.direction_deg = direction_deg % 360
+        self._direction_rad = math.radians(self.direction_deg)
+        self._reset_clock()
+
+    def reset(self) -> None:
+        self._offset_x = 0.0
+        self._offset_y = 0.0
+        self._reset_clock()
+
+    def _reset_clock(self) -> None:
+        self._last_update = None

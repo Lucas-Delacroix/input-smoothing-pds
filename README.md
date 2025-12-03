@@ -16,10 +16,15 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
    ```bash
    pip install -r requirements.txt
    ```
-3. (Opcional) Configure a simulação de tremor do mouse em `src/config.py`:
-   - `TREMOR_ENABLED`: `True` para ativar, `False` para desativar
-   - `TREMOR_INTENSITY`: intensidade do tremor em pixels (padrão: 5.0)
-   - `TREMOR_FREQUENCY`: frequência do tremor em Hz (padrão: 10.0)
+3. (Opcional) Configure as simulações em `src/config.py`:
+   - Tremor:
+     - `TREMOR_ENABLED`: `True` para ativar, `False` para desativar
+     - `TREMOR_INTENSITY`: intensidade do tremor em pixels (padrão: 5.0)
+     - `TREMOR_FREQUENCY`: frequência do tremor em Hz (padrão: 10.0)
+   - Drift artificial:
+     - `DRIFT_ENABLED`: liga/desliga o drift contínuo (padrão: `True`)
+     - `DRIFT_PIXELS_PER_SECOND`: velocidade do drift em px/s (padrão: 20.0)
+     - `DRIFT_DIRECTION_DEG`: direção do drift em graus (0° = direita, 90° = baixo)
 4. Rode o app:
    ```bash
    python3 src/main.py
@@ -49,7 +54,7 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
 - **Linha verde**: média móvel dos pontos.
 - **Linha azul**: suavização exponencial (IIR).
 - **Círculos**: indicam a posição atual de cada série.
-- **HUD**: mostra os parâmetros ativos, controles, estado de visibilidade e status do tremor.
+- **HUD**: mostra os parâmetros ativos, controles, estado de visibilidade e status do tremor/drift.
 - **Gráfico de Métricas** (canto superior direito): mostra FPS e latência em tempo real.
 - **Indicador Visual**: aparece quando parâmetros são alterados.
 
@@ -59,6 +64,14 @@ A aplicação inclui um simulador de tremor do mouse que adiciona ruído ao inpu
 - **Ruído gaussiano**: tremor aleatório mais realista
 
 Configure o tremor em `src/config.py` antes de iniciar o programa. O status do tremor é exibido no HUD durante a execução.
+
+### Simulação de Drift Artificial
+Além do tremor, há um drift artificial simples para testar filtros de correção de desvio. O drift aplica um movimento constante ao cursor (por padrão, para a direita) acumulando deslocamento ao longo do tempo.
+
+Parâmetros configuráveis em `src/config.py`:
+- `DRIFT_ENABLED`: ativa/desativa o drift
+- `DRIFT_PIXELS_PER_SECOND`: velocidade constante em px/s
+- `DRIFT_DIRECTION_DEG`: direção do vetor de drift em graus (0° = direita, 90° = baixo)
 
 ### Gráficos 3D
 Ao pressionar `G`, são gerados dois gráficos 3D salvos na pasta `output/`:
@@ -71,5 +84,5 @@ Ao pressionar `G`, são gerados dois gráficos 3D salvos na pasta `output/`:
 - `src/ui_state.py`: classes para gerenciar estado da UI (zoom, pan, visibilidade, métricas).
 - `src/input_device.py`: estruturas de dados e filtros (média móvel e IIR) com buffers.
 - `src/filters.py`: funções puras de filtragem.
-- `src/tremor_simulator.py`: simulação de tremor no input do mouse.
+- `src/tremor_simulator.py`: simulação de tremor e drift artificial no input do mouse.
 - `src/plot_3d.py`: geração de visualizações 3D usando matplotlib.

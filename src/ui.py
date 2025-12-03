@@ -219,6 +219,7 @@ def _draw_hud(
     transform: ViewTransform,
     fullscreen: bool,
     tremor_sim,
+    drift_sim,
 ) -> None:
     lines = [
         f"N (moving_average): {smoother.window_size}",
@@ -226,6 +227,8 @@ def _draw_hud(
         f"Histórico (H): {'ON' if history_enabled else 'OFF'}",
         f"Tremor: {'ON' if tremor_sim.enabled else 'OFF'} "
         f"(Int: {tremor_sim.intensity:.1f}, Freq: {tremor_sim.frequency:.1f}Hz)",
+        f"Drift artificial: {'ON' if drift_sim.enabled else 'OFF'} "
+        f"({drift_sim.pixels_per_second:.1f}px/s, Dir: {drift_sim.direction_deg:.0f}°)",
         f"Visibilidade:",
         f"  Raw (1): {'ON' if visibility.raw_visible else 'OFF'}",
         f"  MA (2): {'ON' if visibility.ma_visible else 'OFF'}",
@@ -264,6 +267,7 @@ def render_frame(
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
     tremor_sim,
+    drift_sim,
     tremor_modal=None,
 ) -> None:
     screen.fill(BACKGROUND_COLOR)
@@ -272,7 +276,7 @@ def render_frame(
         _draw_traces(screen, smoother, transform, visibility)
     
     _draw_markers(screen, raw_point, ma_point, exp_point, transform, visibility)
-    _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim)
+    _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim, drift_sim)
     _draw_param_change_indicator(screen, font, param_indicator)
     
     if tremor_modal:

@@ -16,9 +16,12 @@ from config import (
     TREMOR_ENABLED,
     TREMOR_INTENSITY,
     TREMOR_FREQUENCY,
+    DRIFT_ENABLED,
+    DRIFT_PIXELS_PER_SECOND,
+    DRIFT_DIRECTION_DEG,
 )
 from input_device import InputSmoother
-from tremor_simulator import TremorSimulator
+from tremor_simulator import DriftSimulator, TremorSimulator
 from tremor_modal import TremorModal
 from ui import (
     build_font,
@@ -54,6 +57,12 @@ def main() -> None:
         enabled=TREMOR_ENABLED,
         intensity=TREMOR_INTENSITY,
         frequency=TREMOR_FREQUENCY,
+    )
+
+    drift_sim = DriftSimulator(
+        enabled=DRIFT_ENABLED,
+        pixels_per_second=DRIFT_PIXELS_PER_SECOND,
+        direction_deg=DRIFT_DIRECTION_DEG,
     )
 
     tremor_modal = TremorModal(tremor_sim, font)
@@ -113,6 +122,7 @@ def main() -> None:
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x, mouse_y = tremor_sim.apply_tremor(mouse_x, mouse_y)
+        mouse_x, mouse_y = drift_sim.apply_drift(mouse_x, mouse_y)
         
         raw_point, ma_point, exp_point = smoother.add_sample(
             mouse_x,
@@ -139,6 +149,7 @@ def main() -> None:
             param_indicator,
             fullscreen,
             tremor_sim,
+            drift_sim,
             tremor_modal,
         )
 
