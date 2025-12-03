@@ -65,7 +65,7 @@ def main() -> None:
         direction_deg=DRIFT_DIRECTION_DEG,
     )
 
-    tremor_modal = TremorModal(tremor_sim, font)
+    tremor_modal = TremorModal(tremor_sim, drift_sim, font)
 
     history_enabled = DEFAULT_HISTORY_ENABLED
     view_transform = ViewTransform()
@@ -96,7 +96,7 @@ def main() -> None:
                     if tremor_modal.slider_dragging:
                         tremor_modal.handle_mouse(event.pos, 0, True)
         else:
-            running, history_enabled, fullscreen, generate_3d, open_modal = handle_events(
+            running, history_enabled, fullscreen, generate_3d, modal_to_open = handle_events(
                 smoother,
                 history_enabled,
                 view_transform,
@@ -105,8 +105,8 @@ def main() -> None:
                 fullscreen,
             )
 
-            if open_modal:
-                tremor_modal.open()
+            if modal_to_open:
+                tremor_modal.open(modal_to_open)
 
             if not running:
                 break

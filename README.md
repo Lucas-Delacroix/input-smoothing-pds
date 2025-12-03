@@ -45,6 +45,10 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
 - `R`: reset zoom e pan.
 - `F11`: alterna modo tela cheia.
 
+### Simulações (Tremor/Drift)
+- `CTRL+SPACE`: abre o modal do tremor (liga/desliga, intensidade, frequência).
+- `CTRL+D`: abre o modal do drift (liga/desliga, velocidade, direção).
+
 ### Análise e Exportação
 - `G`: gera gráficos 3D dos resultados (salvos na pasta `output/`).
   - Cria dois arquivos: plot 3D do caminho e mapa de densidade 3D.
@@ -63,12 +67,12 @@ A aplicação inclui um simulador de tremor do mouse que adiciona ruído ao inpu
 - **Oscilação senoidal**: movimento suave e periódico
 - **Ruído gaussiano**: tremor aleatório mais realista
 
-Configure o tremor em `src/config.py` antes de iniciar o programa. O status do tremor é exibido no HUD durante a execução.
+Configure o tremor em `src/config.py` antes de iniciar o programa ou ajuste em tempo real pelo modal (`CTRL+SPACE`). O status do tremor é exibido no HUD durante a execução.
 
 ### Simulação de Drift Artificial
 Além do tremor, há um drift artificial simples para testar filtros de correção de desvio. O drift aplica um movimento constante ao cursor (por padrão, para a direita) acumulando deslocamento ao longo do tempo.
 
-Parâmetros configuráveis em `src/config.py`:
+Parâmetros configuráveis em `src/config.py` ou diretamente no modal (`CTRL+D`):
 - `DRIFT_ENABLED`: ativa/desativa o drift
 - `DRIFT_PIXELS_PER_SECOND`: velocidade constante em px/s
 - `DRIFT_DIRECTION_DEG`: direção do vetor de drift em graus (0° = direita, 90° = baixo)
