@@ -4,7 +4,7 @@ import time
 
 import pygame
 
-from tremor_simulator import TremorSimulator
+from tremor_simulator import DriftSimulator, TremorSimulator
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,9 @@ class FieldConfig:
 
 
 class TremorModal:
+    MODE_TREMOR = "tremor"
+    MODE_DRIFT = "drift"
+
     MODAL_WIDTH = 850
     MODAL_HEIGHT = 600
     MODAL_ANIM_DISTANCE = 50
@@ -38,27 +41,52 @@ class TremorModal:
     TOGGLE_HEIGHT = 35
     TOGGLE_MARGIN_RIGHT = 20
 
-    FIELDS: Tuple[FieldConfig, ...] = (
-        FieldConfig("Ativar Tremor", "temp_enabled", "bool"),
-        FieldConfig("Intensidade", "temp_intensity", "float", 0.0, 50.0, 0.5),
-        FieldConfig("Frequência (Hz)", "temp_frequency", "float", 0.1, 50.0, 0.5),
-    )
+    FIELD_GROUPS: dict[str, Tuple[FieldConfig, ...]] = {
+        MODE_TREMOR: (
+            FieldConfig("Ativar Tremor", "temp_enabled", "bool"),
+            FieldConfig("Intensidade", "temp_intensity", "float", 0.0, 50.0, 0.5),
+            FieldConfig("Frequência (Hz)", "temp_frequency", "float", 0.1, 50.0, 0.5),
+        ),
+        MODE_DRIFT: (
+            FieldConfig("Ativar Drift", "temp_drift_enabled", "bool"),
+            FieldConfig("Velocidade (px/s)", "temp_drift_speed", "float", 0.0, 300.0, 1.0),
+            FieldConfig("Direção (°)", "temp_drift_direction", "float", 0.0, 360.0, 1.0),
+        ),
+    }
 
-    def __init__(self, tremor_sim: TremorSimulator, font: pygame.font.Font):
+    TITLES: dict[str, str] = {
+        MODE_TREMOR: "Configuração de Tremor",
+        MODE_DRIFT: "Configuração de Drift",
+    }
+
+    def __init__(
+        self,
+        tremor_sim: TremorSimulator,
+        drift_sim: DriftSimulator,
+        font: pygame.font.Font,
+    ):
         self.tremor_sim = tremor_sim
+        self.drift_sim = drift_sim
         self.font = font
+        self.active_mode = self.MODE_TREMOR
         self.active = False
         self.selected_field = 0
         self.temp_enabled = False
         self.temp_intensity = 5.0
         self.temp_frequency = 10.0
+        self.temp_drift_enabled = False
+        self.temp_drift_speed = 0.0
+        self.temp_drift_direction = 0.0
         self.input_text = ""
         self.editing_field = False
         self.slider_dragging = False
         self.slider_drag_field: Optional[int] = None
         self.open_time = 0.0
 
-    def open(self) -> None:
+    def open(self, mode: str = MODE_TREMOR) -> None:
+        if mode not in self.FIELD_GROUPS:
+            mode = self.MODE_TREMOR
+        self.active_mode = mode
         self.active = True
         self._sync_from_simulator()
         self.selected_field = 0
@@ -82,6 +110,14 @@ class TremorModal:
 
         if key == pygame.K_ESCAPE:
             self.close()
+            return True
+
+        if (mod & pygame.KMOD_CTRL) and key == pygame.K_SPACE:
+            self.open(self.MODE_TREMOR)
+            return True
+
+        if (mod & pygame.KMOD_CTRL) and key == pygame.K_d:
+            self.open(self.MODE_DRIFT)
             return True
 
         if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
@@ -175,13 +211,14 @@ class TremorModal:
         return False
 
     def _move_selection(self, delta: int) -> None:
-        total_fields = len(self.FIELDS)
+        total_fields = len(self.fields)
         self.selected_field = (self.selected_field + delta) % total_fields
 
     def _toggle_or_edit_current(self) -> None:
-        field = self.FIELDS[self.selected_field]
+        field = self.fields[self.selected_field]
         if field.field_type == "bool":
-            self.temp_enabled = not self.temp_enabled
+            current_value = bool(self._get_field_value(field))
+            self._set_field_value(field, not current_value)
             self._apply_changes()
             return
 
@@ -189,9 +226,10 @@ class TremorModal:
         self.input_text = f"{self._get_field_value(field):.2f}"
 
     def _adjust_selected_field(self, direction: int) -> None:
-        field = self.FIELDS[self.selected_field]
+        field = self.fields[self.selected_field]
         if field.field_type == "bool":
-            self.temp_enabled = not self.temp_enabled
+            current_value = bool(self._get_field_value(field))
+            self._set_field_value(field, not current_value)
             self._apply_changes()
             return
 
@@ -201,7 +239,7 @@ class TremorModal:
         self._apply_changes()
 
     def _apply_input(self) -> None:
-        field = self.FIELDS[self.selected_field]
+        field = self.fields[self.selected_field]
         try:
             value = float(self.input_text)
         except ValueError:
@@ -223,7 +261,7 @@ class TremorModal:
         ratio = (mouse_x - slider_x) / slider_width
         ratio = self._clamp(ratio, 0.0, 1.0)
 
-        field = self.FIELDS[field_index]
+        field = self.fields[field_index]
         min_value = field.min_value or 0.0
         max_value = field.max_value or min_value
         value = min_value + ratio * (max_value - min_value)
@@ -231,7 +269,7 @@ class TremorModal:
         self._apply_changes()
 
     def _slider_at_position(self, pos: Tuple[int, int], layout: "ModalLayout") -> Optional[int]:
-        for index, field in enumerate(self.FIELDS):
+        for index, field in enumerate(self.fields):
             if field.field_type != "float":
                 continue
             field_rect = self._field_rect(layout, index)
@@ -271,6 +309,10 @@ class TremorModal:
             anim_progress=anim_progress,
         )
 
+    @property
+    def fields(self) -> Tuple[FieldConfig, ...]:
+        return self.FIELD_GROUPS[self.active_mode]
+
     def _draw_overlay(self, screen: pygame.Surface, anim_progress: float) -> None:
         overlay_alpha = int(self.OVERLAY_ALPHA * anim_progress)
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
@@ -300,12 +342,20 @@ class TremorModal:
         )
 
     def _draw_title_and_header(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
-        title_text = "Configuração de Tremor"
+        title_text = self.TITLES[self.active_mode]
         title = self.font.render(title_text, True, (255, 255, 255))
         title_rect = title.get_rect(center=(layout.x + layout.width // 2, layout.y + 50))
         screen.blit(title, title_rect)
 
         separator_y = layout.y + 85
+        subtitle_text = (
+            f"Modo atual: {'Tremor' if self.active_mode == self.MODE_TREMOR else 'Drift'}"
+            "  |  Ctrl+Espaço: Tremor  |  Ctrl+D: Drift"
+        )
+        subtitle_surf = self.font.render(subtitle_text, True, (170, 180, 200))
+        subtitle_rect = subtitle_surf.get_rect(center=(layout.x + layout.width // 2, separator_y - 18))
+        screen.blit(subtitle_surf, subtitle_rect)
+
         pygame.draw.line(
             screen,
             (70, 120, 200),
@@ -315,7 +365,7 @@ class TremorModal:
         )
 
     def _draw_fields(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
-        for index, field in enumerate(self.FIELDS):
+        for index, field in enumerate(self.fields):
             value = self._get_field_value(field)
             is_selected = index == self.selected_field
             is_editing = is_selected and self.editing_field
@@ -390,7 +440,7 @@ class TremorModal:
     ) -> None:
         slider_x, slider_y, slider_width = self._slider_geometry(field_rect)
 
-        field = self.FIELDS[field_index]
+        field = self.fields[field_index]
         min_value = field.min_value or 0.0
         max_value = field.max_value or min_value
         ratio = (value - min_value) / (max_value - min_value) if max_value > min_value else 0.0
@@ -413,13 +463,13 @@ class TremorModal:
 
     def _draw_footer(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
         preview_y = layout.y + layout.height - 110
-        preview_text = f"Preview: {'Ativo' if self.temp_enabled else 'Inativo'}"
+        preview_text = self._preview_text()
         preview_surf = self.font.render(preview_text, True, (150, 200, 255))
         screen.blit(preview_surf, (layout.x + 65, preview_y))
 
         help_lines = [
             "←/→: Ajustar  |  ↑/↓: Navegar  |  Enter: Aplicar  |  ESC: Fechar",
-            "Clique e arraste nos sliders para ajustar valores",
+            "Ctrl+Espaço: Tremor  |  Ctrl+D: Drift  |  Arraste sliders para ajustar",
         ]
 
         help_start_y = layout.y + layout.height - 70
@@ -442,15 +492,46 @@ class TremorModal:
     def _set_field_value(self, field: FieldConfig, value: float) -> None:
         setattr(self, field.attr, value)
 
+    def _preview_text(self) -> str:
+        if self.active_mode == self.MODE_TREMOR:
+            status = "Ativo" if self.temp_enabled else "Inativo"
+            return (
+                f"Preview: Tremor {status}  |  Int: {self.temp_intensity:.1f}  |  "
+                f"Freq: {self.temp_frequency:.1f} Hz"
+            )
+
+        status = "Ativo" if self.temp_drift_enabled else "Inativo"
+        return (
+            f"Preview: Drift {status}  |  Vel: {self.temp_drift_speed:.1f} px/s  |  "
+            f"Dir: {self.temp_drift_direction:.0f}°"
+        )
+
     def _apply_changes(self) -> None:
-        self.tremor_sim.set_enabled(self.temp_enabled)
-        self.tremor_sim.set_intensity(self.temp_intensity)
-        self.tremor_sim.set_frequency(self.temp_frequency)
+        if self.active_mode == self.MODE_TREMOR:
+            self.tremor_sim.set_enabled(self.temp_enabled)
+            self.tremor_sim.set_intensity(self.temp_intensity)
+            self.tremor_sim.set_frequency(self.temp_frequency)
+            self.temp_enabled = self.tremor_sim.enabled
+            self.temp_intensity = self.tremor_sim.intensity
+            self.temp_frequency = self.tremor_sim.frequency
+            return
+
+        self.drift_sim.set_enabled(self.temp_drift_enabled)
+        self.drift_sim.set_speed(self.temp_drift_speed)
+        self.drift_sim.set_direction(self.temp_drift_direction)
+        self.temp_drift_enabled = self.drift_sim.enabled
+        self.temp_drift_speed = self.drift_sim.pixels_per_second
+        self.temp_drift_direction = self.drift_sim.direction_deg
 
     def _sync_from_simulator(self) -> None:
-        self.temp_enabled = self.tremor_sim.enabled
-        self.temp_intensity = self.tremor_sim.intensity
-        self.temp_frequency = self.tremor_sim.frequency
+        if self.active_mode == self.MODE_TREMOR:
+            self.temp_enabled = self.tremor_sim.enabled
+            self.temp_intensity = self.tremor_sim.intensity
+            self.temp_frequency = self.tremor_sim.frequency
+        else:
+            self.temp_drift_enabled = self.drift_sim.enabled
+            self.temp_drift_speed = self.drift_sim.pixels_per_second
+            self.temp_drift_direction = self.drift_sim.direction_deg
 
     def _animation_progress(self) -> float:
         if self.open_time == 0.0:

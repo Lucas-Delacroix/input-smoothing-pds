@@ -61,16 +61,18 @@ def handle_events(
     visibility: VisibilityState,
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
-) -> Tuple[bool, bool, bool, bool, bool]:
+) -> Tuple[bool, bool, bool, bool, Optional[str]]:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            return False, history_enabled, fullscreen, False, False
+            return False, history_enabled, fullscreen, False, None
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                return False, history_enabled, fullscreen, False, False
+                return False, history_enabled, fullscreen, False, None
             if event.key == pygame.K_SPACE and (event.mod & pygame.KMOD_CTRL):
-                return True, history_enabled, fullscreen, False, True
+                return True, history_enabled, fullscreen, False, "tremor"
+            if event.key == pygame.K_d and (event.mod & pygame.KMOD_CTRL):
+                return True, history_enabled, fullscreen, False, "drift"
             result = _handle_key(
                 event.key, smoother, history_enabled, view_transform,
                 visibility, param_indicator, fullscreen
@@ -78,10 +80,10 @@ def handle_events(
             if result is not None:
                 history_enabled, fullscreen, generate_3d = result
                 if generate_3d:
-                    return True, history_enabled, fullscreen, True, False
+                    return True, history_enabled, fullscreen, True, None
 
 
-    return True, history_enabled, fullscreen, False, False
+    return True, history_enabled, fullscreen, False, None
 
 
 def _handle_key(
@@ -242,6 +244,7 @@ def _draw_hud(
         "  F11          -> tela cheia",
         "  G            -> gerar gráfico 3D",
         "  CTRL+SPACE    -> configurar tremor",
+        "  CTRL+D        -> configurar drift",
         "  ESC          -> sair",
     ]
 
