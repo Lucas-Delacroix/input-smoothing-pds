@@ -1,11 +1,49 @@
+from dataclasses import dataclass
 from typing import Optional, Tuple
-import pygame
 import time
+
+import pygame
 
 from tremor_simulator import TremorSimulator
 
 
+@dataclass(frozen=True)
+class FieldConfig:
+    label: str
+    attr: str
+    field_type: str
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    step: float = 0.5
+
+
 class TremorModal:
+    MODAL_WIDTH = 850
+    MODAL_HEIGHT = 600
+    MODAL_ANIM_DISTANCE = 50
+    OVERLAY_ALPHA = 180
+    SHADOW_OFFSET = 8
+    FIELD_MARGIN_X = 50
+    FIELD_HEIGHT = 95
+    FIELD_TOP = 110
+    FIELD_SPACING = 110
+    LABEL_OFFSET_X = 15
+    LABEL_OFFSET_Y = 18
+    SLIDER_HEIGHT = 14
+    SLIDER_DETECTION_HEIGHT = 60
+    SLIDER_OFFSET_Y = 55
+    SLIDER_PADDING_X = 15
+    VALUE_MARGIN_RIGHT = 20
+    TOGGLE_SIZE = 70
+    TOGGLE_HEIGHT = 35
+    TOGGLE_MARGIN_RIGHT = 20
+
+    FIELDS: Tuple[FieldConfig, ...] = (
+        FieldConfig("Ativar Tremor", "temp_enabled", "bool"),
+        FieldConfig("Intensidade", "temp_intensity", "float", 0.0, 50.0, 0.5),
+        FieldConfig("Frequência (Hz)", "temp_frequency", "float", 0.1, 50.0, 0.5),
+    )
+
     def __init__(self, tremor_sim: TremorSimulator, font: pygame.font.Font):
         self.tremor_sim = tremor_sim
         self.font = font
@@ -16,337 +54,422 @@ class TremorModal:
         self.temp_frequency = 10.0
         self.input_text = ""
         self.editing_field = False
-        self.animation_time = 0.0
         self.slider_dragging = False
-        self.slider_drag_field = None
-        
+        self.slider_drag_field: Optional[int] = None
+        self.open_time = 0.0
+
     def open(self) -> None:
         self.active = True
-        self.temp_enabled = self.tremor_sim.enabled
-        self.temp_intensity = self.tremor_sim.intensity
-        self.temp_frequency = self.tremor_sim.frequency
+        self._sync_from_simulator()
         self.selected_field = 0
         self.editing_field = False
         self.input_text = ""
-        self.animation_time = time.time()
-        self.open_time = time.time()
         self.slider_dragging = False
-        
+        self.slider_drag_field = None
+        self.open_time = time.time()
+
     def close(self) -> None:
+        self._apply_changes()
         self.active = False
         self.editing_field = False
         self.input_text = ""
         self.slider_dragging = False
-        self._apply_changes()
-        
+        self.slider_drag_field = None
+
     def handle_key(self, key: int, mod: int) -> bool:
         if not self.active:
             return False
-            
+
         if key == pygame.K_ESCAPE:
             self.close()
             return True
-            
-        if key == pygame.K_RETURN or key == pygame.K_KP_ENTER:
+
+        if key in (pygame.K_RETURN, pygame.K_KP_ENTER):
             if self.editing_field:
                 self._apply_input()
             else:
-                self._apply_changes()
                 self.close()
             return True
-            
-        if key == pygame.K_UP:
-            if not self.editing_field:
-                self.selected_field = (self.selected_field - 1) % 3
-            return True
-            
-        if key == pygame.K_DOWN:
-            if not self.editing_field:
-                self.selected_field = (self.selected_field + 1) % 3
-            return True
-            
-        if key == pygame.K_LEFT:
-            if not self.editing_field:
-                if self.selected_field == 0:
-                    self.temp_enabled = not self.temp_enabled
-                    self._apply_changes()
-                elif self.selected_field == 1:
-                    self.temp_intensity = max(0.0, self.temp_intensity - 0.5)
-                    self._apply_changes()
-                elif self.selected_field == 2:
-                    self.temp_frequency = max(0.1, self.temp_frequency - 0.5)
-                    self._apply_changes()
-            return True
-            
-        if key == pygame.K_RIGHT:
-            if not self.editing_field:
-                if self.selected_field == 0:
-                    self.temp_enabled = not self.temp_enabled
-                    self._apply_changes()
-                elif self.selected_field == 1:
-                    self.temp_intensity = min(50.0, self.temp_intensity + 0.5)
-                    self._apply_changes()
-                elif self.selected_field == 2:
-                    self.temp_frequency = min(50.0, self.temp_frequency + 0.5)
-                    self._apply_changes()
-            return True
-            
-        if key == pygame.K_TAB:
-            if not self.editing_field:
-                self.selected_field = (self.selected_field + 1) % 3
-            return True
-            
-        if key == pygame.K_BACKSPACE:
-            if self.editing_field:
-                self.input_text = self.input_text[:-1]
-            return True
-            
+
         if self.editing_field:
-            if key == pygame.K_PERIOD or key == pygame.K_KP_PERIOD:
-                if '.' not in self.input_text:
-                    self.input_text += '.'
-                return True
-            if pygame.K_0 <= key <= pygame.K_9 or pygame.K_KP0 <= key <= pygame.K_KP9:
-                digit = str(key - pygame.K_0) if key <= pygame.K_9 else str(key - pygame.K_KP0)
-                self.input_text += digit
-                return True
-        else:
-            if key == pygame.K_RETURN or key == pygame.K_KP_ENTER or key == pygame.K_SPACE:
-                if self.selected_field == 0:
-                    self.temp_enabled = not self.temp_enabled
-                    self._apply_changes()
-                else:
-                    self.editing_field = True
-                    if self.selected_field == 1:
-                        self.input_text = str(self.temp_intensity)
-                    elif self.selected_field == 2:
-                        self.input_text = str(self.temp_frequency)
-                return True
-                
+            return self._handle_editing_input(key)
+
+        if key == pygame.K_UP:
+            self._move_selection(-1)
+            return True
+
+        if key == pygame.K_DOWN:
+            self._move_selection(1)
+            return True
+
+        if key == pygame.K_LEFT:
+            self._adjust_selected_field(-1)
+            return True
+
+        if key == pygame.K_RIGHT:
+            self._adjust_selected_field(1)
+            return True
+
+        if key == pygame.K_TAB:
+            self._move_selection(1)
+            return True
+
+        if key == pygame.K_SPACE:
+            self._toggle_or_edit_current()
+            return True
+
         return False
-        
+
     def handle_mouse(self, pos: Tuple[int, int], button: int, pressed: bool) -> bool:
         if not self.active:
             return False
-            
-        screen_width, screen_height = pygame.display.get_surface().get_size()
-        modal_width = 850
-        modal_height = 600
-        modal_x = (screen_width - modal_width) // 2
-        modal_y = (screen_height - modal_height) // 2
-        
-        slider_y_start = modal_y + 160
-        slider_height = 110
-        
-        if button == 1:
-            if pressed:
-                for i in [1, 2]:
-                    slider_x = modal_x + 65
-                    slider_y = slider_y_start + i * slider_height
-                    slider_width = modal_width - 130
-                    
-                    if slider_x <= pos[0] <= slider_x + slider_width and slider_y <= pos[1] <= slider_y + 60:
-                        self.slider_dragging = True
-                        self.slider_drag_field = i
-                        self._update_slider_from_mouse(pos[0], slider_x, slider_width, i)
-                        return True
-            else:
-                if self.slider_dragging:
-                    self.slider_dragging = False
-                    self.slider_drag_field = None
-                    return True
-                    
-        if self.slider_dragging and button == 0:
-            if self.slider_drag_field:
-                slider_x = modal_x + 65
-                slider_width = modal_width - 130
-                self._update_slider_from_mouse(pos[0], slider_x, slider_width, self.slider_drag_field)
+
+        layout = self._layout()
+
+        if button == 1 and pressed:
+            slider_hit = self._slider_at_position(pos, layout)
+            if slider_hit is not None:
+                self.slider_dragging = True
+                self.slider_drag_field = slider_hit
+                self._update_slider_from_mouse(pos[0], layout, slider_hit)
                 return True
-                
+
+        if button == 1 and not pressed:
+            if self.slider_dragging:
+                self.slider_dragging = False
+                self.slider_drag_field = None
+                return True
+
+        if button == 0 and self.slider_dragging and self.slider_drag_field is not None:
+            self._update_slider_from_mouse(pos[0], layout, self.slider_drag_field)
+            return True
+
         return False
-        
-    def _update_slider_from_mouse(self, mouse_x: int, slider_x: int, slider_width: int, field: int) -> None:
-        ratio = max(0.0, min(1.0, (mouse_x - slider_x) / slider_width))
-        if field == 1:
-            self.temp_intensity = ratio * 50.0
+
+    def render(self, screen: pygame.Surface) -> None:
+        if not self.active:
+            return
+
+        layout = self._layout(screen.get_size())
+        self._draw_overlay(screen, layout.anim_progress)
+        self._draw_modal_base(screen, layout)
+        self._draw_title_and_header(screen, layout)
+        self._draw_fields(screen, layout)
+        self._draw_footer(screen, layout)
+
+    def _handle_editing_input(self, key: int) -> bool:
+        if key == pygame.K_BACKSPACE:
+            self.input_text = self.input_text[:-1]
+            return True
+
+        if key in (pygame.K_PERIOD, pygame.K_KP_PERIOD):
+            if "." not in self.input_text:
+                self.input_text += "."
+            return True
+
+        if pygame.K_0 <= key <= pygame.K_9 or pygame.K_KP0 <= key <= pygame.K_KP9:
+            digit = str(key - pygame.K_0) if key <= pygame.K_9 else str(key - pygame.K_KP0)
+            self.input_text += digit
+            return True
+
+        return False
+
+    def _move_selection(self, delta: int) -> None:
+        total_fields = len(self.FIELDS)
+        self.selected_field = (self.selected_field + delta) % total_fields
+
+    def _toggle_or_edit_current(self) -> None:
+        field = self.FIELDS[self.selected_field]
+        if field.field_type == "bool":
+            self.temp_enabled = not self.temp_enabled
             self._apply_changes()
-        elif field == 2:
-            self.temp_frequency = 0.1 + ratio * 49.9
+            return
+
+        self.editing_field = True
+        self.input_text = f"{self._get_field_value(field):.2f}"
+
+    def _adjust_selected_field(self, direction: int) -> None:
+        field = self.FIELDS[self.selected_field]
+        if field.field_type == "bool":
+            self.temp_enabled = not self.temp_enabled
             self._apply_changes()
-        
+            return
+
+        new_value = self._get_field_value(field) + direction * field.step
+        clamped = self._clamp(new_value, field.min_value, field.max_value)
+        self._set_field_value(field, clamped)
+        self._apply_changes()
+
     def _apply_input(self) -> None:
+        field = self.FIELDS[self.selected_field]
         try:
             value = float(self.input_text)
-            if self.selected_field == 1:
-                self.temp_intensity = max(0.0, min(50.0, value))
-            elif self.selected_field == 2:
-                self.temp_frequency = max(0.1, min(50.0, value))
-            self._apply_changes()
         except ValueError:
-            pass
+            self._reset_edit_state()
+            return
+
+        clamped = self._clamp(value, field.min_value, field.max_value)
+        self._set_field_value(field, clamped)
+        self._apply_changes()
+        self._reset_edit_state()
+
+    def _reset_edit_state(self) -> None:
         self.editing_field = False
         self.input_text = ""
-        
+
+    def _update_slider_from_mouse(self, mouse_x: int, layout: "ModalLayout", field_index: int) -> None:
+        field_rect = self._field_rect(layout, field_index)
+        slider_x, _, slider_width = self._slider_geometry(field_rect)
+        ratio = (mouse_x - slider_x) / slider_width
+        ratio = self._clamp(ratio, 0.0, 1.0)
+
+        field = self.FIELDS[field_index]
+        min_value = field.min_value or 0.0
+        max_value = field.max_value or min_value
+        value = min_value + ratio * (max_value - min_value)
+        self._set_field_value(field, value)
+        self._apply_changes()
+
+    def _slider_at_position(self, pos: Tuple[int, int], layout: "ModalLayout") -> Optional[int]:
+        for index, field in enumerate(self.FIELDS):
+            if field.field_type != "float":
+                continue
+            field_rect = self._field_rect(layout, index)
+            slider_x, slider_y, slider_width = self._slider_geometry(field_rect)
+            if (
+                slider_x <= pos[0] <= slider_x + slider_width
+                and slider_y <= pos[1] <= slider_y + self.SLIDER_DETECTION_HEIGHT
+            ):
+                return index
+        return None
+
+    def _field_rect(self, layout: "ModalLayout", index: int) -> pygame.Rect:
+        return pygame.Rect(
+            layout.x + self.FIELD_MARGIN_X,
+            layout.y + self.FIELD_TOP + index * self.FIELD_SPACING,
+            layout.width - 2 * self.FIELD_MARGIN_X,
+            self.FIELD_HEIGHT,
+        )
+
+    def _layout(self, screen_size: Optional[Tuple[int, int]] = None) -> "ModalLayout":
+        if screen_size is None:
+            screen_size = pygame.display.get_surface().get_size()
+
+        screen_width, screen_height = screen_size
+        modal_x = (screen_width - self.MODAL_WIDTH) // 2
+        modal_y = (screen_height - self.MODAL_HEIGHT) // 2
+
+        anim_progress = self._animation_progress()
+        modal_offset_y = (1.0 - anim_progress) * self.MODAL_ANIM_DISTANCE
+        actual_modal_y = int(modal_y + modal_offset_y)
+
+        return ModalLayout(
+            x=modal_x,
+            y=actual_modal_y,
+            width=self.MODAL_WIDTH,
+            height=self.MODAL_HEIGHT,
+            anim_progress=anim_progress,
+        )
+
+    def _draw_overlay(self, screen: pygame.Surface, anim_progress: float) -> None:
+        overlay_alpha = int(self.OVERLAY_ALPHA * anim_progress)
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, overlay_alpha))
+        screen.blit(overlay, (0, 0))
+
+    def _draw_modal_base(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
+        shadow_surf = pygame.Surface(
+            (layout.width + self.SHADOW_OFFSET * 2, layout.height + self.SHADOW_OFFSET * 2),
+            pygame.SRCALPHA,
+        )
+        shadow_surf.fill((0, 0, 0, 120))
+        screen.blit(shadow_surf, (layout.x - self.SHADOW_OFFSET, layout.y - self.SHADOW_OFFSET))
+
+        pygame.draw.rect(
+            screen,
+            (25, 28, 32),
+            (layout.x, layout.y, layout.width, layout.height),
+            border_radius=10,
+        )
+        pygame.draw.rect(
+            screen,
+            (70, 120, 200),
+            (layout.x, layout.y, layout.width, layout.height),
+            3,
+            border_radius=10,
+        )
+
+    def _draw_title_and_header(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
+        title_text = "Configuração de Tremor"
+        title = self.font.render(title_text, True, (255, 255, 255))
+        title_rect = title.get_rect(center=(layout.x + layout.width // 2, layout.y + 50))
+        screen.blit(title, title_rect)
+
+        separator_y = layout.y + 85
+        pygame.draw.line(
+            screen,
+            (70, 120, 200),
+            (layout.x + 50, separator_y),
+            (layout.x + layout.width - 50, separator_y),
+            2,
+        )
+
+    def _draw_fields(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
+        for index, field in enumerate(self.FIELDS):
+            value = self._get_field_value(field)
+            is_selected = index == self.selected_field
+            is_editing = is_selected and self.editing_field
+            field_rect = self._field_rect(layout, index)
+
+            self._draw_field_box(screen, field_rect, is_selected)
+            self._draw_field_label(screen, field.label, field_rect)
+
+            if field.field_type == "bool":
+                self._draw_toggle(screen, field_rect, bool(value))
+            else:
+                self._draw_value(screen, field_rect, value, is_editing)
+                self._draw_slider(screen, field_rect, index, value)
+
+    def _draw_field_box(
+        self,
+        screen: pygame.Surface,
+        field_rect: pygame.Rect,
+        is_selected: bool,
+    ) -> None:
+        bg_color = (45, 55, 65) if is_selected else (35, 40, 45)
+        pygame.draw.rect(screen, bg_color, field_rect, border_radius=8)
+
+        if is_selected:
+            border_color = (100, 150, 255)
+            pygame.draw.rect(screen, border_color, field_rect, 2, border_radius=8)
+
+    def _draw_field_label(self, screen: pygame.Surface, label: str, field_rect: pygame.Rect) -> None:
+        label_text = self.font.render(f"{label}:", True, (220, 220, 220))
+        screen.blit(label_text, (field_rect.x + self.LABEL_OFFSET_X, field_rect.y + self.LABEL_OFFSET_Y))
+
+    def _draw_toggle(self, screen: pygame.Surface, field_rect: pygame.Rect, enabled: bool) -> None:
+        toggle_x = field_rect.right - self.TOGGLE_MARGIN_RIGHT - self.TOGGLE_SIZE
+        toggle_y = field_rect.centery - self.TOGGLE_HEIGHT // 2
+
+        toggle_bg = (80, 80, 80) if not enabled else (50, 200, 50)
+        pygame.draw.rect(
+            screen,
+            toggle_bg,
+            (toggle_x, toggle_y, self.TOGGLE_SIZE, self.TOGGLE_HEIGHT),
+            border_radius=17,
+        )
+
+        toggle_pos = toggle_x + (self.TOGGLE_SIZE - 28) if enabled else toggle_x + 4
+        toggle_color = (240, 240, 240)
+        pygame.draw.circle(screen, toggle_color, (int(toggle_pos + 14), toggle_y + 17), 14)
+
+        status_text = "ON" if enabled else "OFF"
+        status_color = (0, 255, 100) if enabled else (180, 180, 180)
+        status_surf = self.font.render(status_text, True, status_color)
+        status_x = toggle_x - 85
+        screen.blit(status_surf, (status_x, field_rect.centery - 10))
+
+    def _draw_value(
+        self,
+        screen: pygame.Surface,
+        field_rect: pygame.Rect,
+        value: float,
+        is_editing: bool,
+    ) -> None:
+        value_text = self.input_text if is_editing and self.input_text else f"{value:.2f}"
+        value_surf = self.font.render(value_text, True, (255, 255, 255))
+        value_x = field_rect.right - self.VALUE_MARGIN_RIGHT - value_surf.get_width()
+        screen.blit(value_surf, (value_x, field_rect.y + self.LABEL_OFFSET_Y))
+
+    def _draw_slider(
+        self,
+        screen: pygame.Surface,
+        field_rect: pygame.Rect,
+        field_index: int,
+        value: float,
+    ) -> None:
+        slider_x, slider_y, slider_width = self._slider_geometry(field_rect)
+
+        field = self.FIELDS[field_index]
+        min_value = field.min_value or 0.0
+        max_value = field.max_value or min_value
+        ratio = (value - min_value) / (max_value - min_value) if max_value > min_value else 0.0
+        slider_pos = slider_x + ratio * slider_width
+
+        pygame.draw.rect(screen, (40, 40, 40), (slider_x, slider_y, slider_width, self.SLIDER_HEIGHT), border_radius=5)
+        filled_width = ratio * slider_width
+        if field_index == 1:
+            gradient_color = (255, int(120 + ratio * 135), int(120 + ratio * 135))
+        else:
+            gradient_color = (int(120 + ratio * 135), int(120 + ratio * 135), 255)
+        pygame.draw.rect(screen, gradient_color, (slider_x, slider_y, filled_width, self.SLIDER_HEIGHT), border_radius=5)
+
+        handle_size = 18
+        dragging_current = self.slider_dragging and self.slider_drag_field == field_index
+        handle_color = (255, 255, 100) if dragging_current else (220, 220, 220)
+        handle_y = slider_y + self.SLIDER_HEIGHT // 2
+        pygame.draw.circle(screen, handle_color, (int(slider_pos), handle_y), handle_size // 2)
+        pygame.draw.circle(screen, (60, 60, 60), (int(slider_pos), handle_y), handle_size // 2, 2)
+
+    def _draw_footer(self, screen: pygame.Surface, layout: "ModalLayout") -> None:
+        preview_y = layout.y + layout.height - 110
+        preview_text = f"Preview: {'Ativo' if self.temp_enabled else 'Inativo'}"
+        preview_surf = self.font.render(preview_text, True, (150, 200, 255))
+        screen.blit(preview_surf, (layout.x + 65, preview_y))
+
+        help_lines = [
+            "←/→: Ajustar  |  ↑/↓: Navegar  |  Enter: Aplicar  |  ESC: Fechar",
+            "Clique e arraste nos sliders para ajustar valores",
+        ]
+
+        help_start_y = layout.y + layout.height - 70
+        for index, text in enumerate(help_lines):
+            help_surf = self.font.render(text, True, (140, 140, 140))
+            help_x = layout.x + (layout.width - help_surf.get_width()) // 2
+            help_y = help_start_y + index * 28
+            if help_y + 28 <= layout.y + layout.height - 15:
+                screen.blit(help_surf, (help_x, help_y))
+
+    def _slider_geometry(self, field_rect: pygame.Rect) -> Tuple[int, int, int]:
+        slider_x = field_rect.x + self.SLIDER_PADDING_X
+        slider_width = field_rect.width - 2 * self.SLIDER_PADDING_X
+        slider_y = field_rect.y + self.SLIDER_OFFSET_Y
+        return slider_x, slider_y, slider_width
+
+    def _get_field_value(self, field: FieldConfig) -> float:
+        return getattr(self, field.attr)
+
+    def _set_field_value(self, field: FieldConfig, value: float) -> None:
+        setattr(self, field.attr, value)
+
     def _apply_changes(self) -> None:
         self.tremor_sim.set_enabled(self.temp_enabled)
         self.tremor_sim.set_intensity(self.temp_intensity)
         self.tremor_sim.set_frequency(self.temp_frequency)
-        
-    def _wrap_text(self, text: str, max_width: int) -> list[str]:
-        words = text.split()
-        lines = []
-        current_line = []
-        current_width = 0
-        
-        for word in words:
-            word_surf = self.font.render(word, True, (255, 255, 255))
-            word_width = word_surf.get_width()
-            
-            if current_width + word_width + (len(current_line) * 5) > max_width and current_line:
-                lines.append(' '.join(current_line))
-                current_line = [word]
-                current_width = word_width
-            else:
-                current_line.append(word)
-                current_width += word_width + 5
-        
-        if current_line:
-            lines.append(' '.join(current_line))
-        
-        return lines
-        
-    def render(self, screen: pygame.Surface) -> None:
-        if not self.active:
-            return
-            
-        current_time = time.time()
-        if not hasattr(self, 'open_time') or self.open_time == 0:
-            self.open_time = current_time
-        anim_progress = min(1.0, (current_time - self.open_time) * 3.0)
-        
-        screen_width, screen_height = screen.get_size()
-        modal_width = 850
-        modal_height = 600
-        modal_x = (screen_width - modal_width) // 2
-        modal_y = (screen_height - modal_height) // 2
-        
-        overlay_alpha = int(180 * anim_progress)
-        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, overlay_alpha))
-        screen.blit(overlay, (0, 0))
-        
-        modal_offset_y = (1.0 - anim_progress) * 50
-        actual_modal_y = int(modal_y + modal_offset_y)
-        
-        shadow_offset = 8
-        shadow_surf = pygame.Surface((modal_width + shadow_offset * 2, modal_height + shadow_offset * 2), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, 120))
-        screen.blit(shadow_surf, (modal_x - shadow_offset, actual_modal_y - shadow_offset))
-        
-        pygame.draw.rect(screen, (25, 28, 32), (modal_x, actual_modal_y, modal_width, modal_height), border_radius=10)
-        pygame.draw.rect(screen, (70, 120, 200), (modal_x, actual_modal_y, modal_width, modal_height), 3, border_radius=10)
-        
-        title_text = "Configuração de Tremor"
-        title = self.font.render(title_text, True, (255, 255, 255))
-        title_rect = title.get_rect(center=(modal_x + modal_width // 2, actual_modal_y + 50))
-        screen.blit(title, title_rect)
-        
-        separator_y = actual_modal_y + 85
-        pygame.draw.line(screen, (70, 120, 200), (modal_x + 50, separator_y), (modal_x + modal_width - 50, separator_y), 2)
-        
-        y_offset = actual_modal_y + 110
-        line_height = 110
-        
-        fields = [
-            ("Ativar Tremor", self.temp_enabled, "bool", None),
-            ("Intensidade", self.temp_intensity, "float", (0.0, 50.0)),
-            ("Frequência (Hz)", self.temp_frequency, "float", (0.1, 50.0)),
-        ]
-        
-        for i, (label, value, field_type, value_range) in enumerate(fields):
-            is_selected = i == self.selected_field
-            is_editing = is_selected and self.editing_field
-            
-            bg_color = (45, 55, 65) if is_selected else (35, 40, 45)
-            
-            field_rect = pygame.Rect(modal_x + 50, y_offset, modal_width - 100, 95)
-            pygame.draw.rect(screen, bg_color, field_rect, border_radius=8)
-            
-            if is_selected:
-                border_color = (100, 150, 255)
-                pygame.draw.rect(screen, border_color, field_rect, 2, border_radius=8)
-            
-            label_text = self.font.render(label + ":", True, (220, 220, 220))
-            screen.blit(label_text, (modal_x + 65, y_offset + 18))
-            
-            if field_type == "bool":
-                toggle_size = 70
-                toggle_x = modal_x + modal_width - 100
-                toggle_y = y_offset + 28
-                
-                toggle_bg = (80, 80, 80) if not value else (50, 200, 50)
-                pygame.draw.rect(screen, toggle_bg, (toggle_x, toggle_y, toggle_size, 35), border_radius=17)
-                
-                toggle_pos = toggle_x + (toggle_size - 28) if value else toggle_x + 4
-                toggle_color = (240, 240, 240)
-                pygame.draw.circle(screen, toggle_color, (int(toggle_pos + 14), toggle_y + 17), 14)
-                
-                status_text = "ON" if value else "OFF"
-                status_color = (0, 255, 100) if value else (180, 180, 180)
-                status_surf = self.font.render(status_text, True, status_color)
-                status_x = toggle_x - 85
-                screen.blit(status_surf, (status_x, y_offset + 35))
-            else:
-                if is_editing:
-                    value_text = self.input_text if self.input_text else f"{value:.2f}"
-                else:
-                    value_text = f"{value:.2f}"
-                value_color = (255, 255, 255)
-                
-                value_surf = self.font.render(value_text, True, value_color)
-                value_x = modal_x + modal_width - 70 - value_surf.get_width()
-                screen.blit(value_surf, (value_x, y_offset + 18))
-                
-                if value_range and i in [1, 2]:
-                    slider_x = modal_x + 65
-                    slider_y = y_offset + 55
-                    slider_width = modal_width - 130
-                    slider_height = 14
-                    
-                    min_val, max_val = value_range
-                    ratio = (value - min_val) / (max_val - min_val)
-                    slider_pos = slider_x + ratio * slider_width
-                    
-                    pygame.draw.rect(screen, (40, 40, 40), (slider_x, slider_y, slider_width, slider_height), border_radius=5)
-                    filled_width = ratio * slider_width
-                    if i == 1:
-                        gradient_color = (255, int(120 + ratio * 135), int(120 + ratio * 135))
-                    else:
-                        gradient_color = (int(120 + ratio * 135), int(120 + ratio * 135), 255)
-                    pygame.draw.rect(screen, gradient_color, (slider_x, slider_y, filled_width, slider_height), border_radius=5)
-                    
-                    handle_size = 18
-                    handle_color = (220, 220, 220) if not (self.slider_dragging and self.slider_drag_field == i) else (255, 255, 100)
-                    handle_y = slider_y + slider_height // 2
-                    pygame.draw.circle(screen, handle_color, (int(slider_pos), handle_y), handle_size // 2)
-                    pygame.draw.circle(screen, (60, 60, 60), (int(slider_pos), handle_y), handle_size // 2, 2)
-            
-            y_offset += line_height
-        
-        preview_y = actual_modal_y + modal_height - 110
-        preview_text = f"Preview: {'Ativo' if self.temp_enabled else 'Inativo'}"
-        preview_surf = self.font.render(preview_text, True, (150, 200, 255))
-        screen.blit(preview_surf, (modal_x + 65, preview_y))
-        
-        help_lines = [
-            "←/→: Ajustar  |  ↑/↓: Navegar  |  Enter: Aplicar  |  ESC: Fechar",
-            "Clique e arraste nos sliders para ajustar valores"
-        ]
-        
-        help_start_y = actual_modal_y + modal_height - 70
-        for i, text in enumerate(help_lines):
-            help_surf = self.font.render(text, True, (140, 140, 140))
-            help_x = modal_x + (modal_width - help_surf.get_width()) // 2
-            help_y = help_start_y + i * 28
-            if help_y + 28 <= actual_modal_y + modal_height - 15:
-                screen.blit(help_surf, (help_x, help_y))
+
+    def _sync_from_simulator(self) -> None:
+        self.temp_enabled = self.tremor_sim.enabled
+        self.temp_intensity = self.tremor_sim.intensity
+        self.temp_frequency = self.tremor_sim.frequency
+
+    def _animation_progress(self) -> float:
+        if self.open_time == 0.0:
+            self.open_time = time.time()
+        return min(1.0, (time.time() - self.open_time) * 3.0)
+
+    @staticmethod
+    def _clamp(value: float, min_value: Optional[float], max_value: Optional[float]) -> float:
+        if min_value is not None:
+            value = max(min_value, value)
+        if max_value is not None:
+            value = min(max_value, value)
+        return value
+
+
+@dataclass(frozen=True)
+class ModalLayout:
+    x: int
+    y: int
+    width: int
+    height: int
+    anim_progress: float
