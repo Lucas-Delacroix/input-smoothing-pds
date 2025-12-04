@@ -19,6 +19,7 @@ from config import (
     DRIFT_ENABLED,
     DRIFT_PIXELS_PER_SECOND,
     DRIFT_DIRECTION_DEG,
+    DRIFT_CORRECTION_WINDOW,
 )
 from input_device import InputSmoother
 from tremor_simulator import DriftSimulator, TremorSimulator
@@ -51,6 +52,7 @@ def main() -> None:
         min_window=MOVING_AVERAGE_MIN,
         min_alpha=ALPHA_MIN,
         max_alpha=ALPHA_MAX,
+        drift_window=DRIFT_CORRECTION_WINDOW,
     )
 
     tremor_sim = TremorSimulator(
@@ -123,11 +125,13 @@ def main() -> None:
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x, mouse_y = tremor_sim.apply_tremor(mouse_x, mouse_y)
         mouse_x, mouse_y = drift_sim.apply_drift(mouse_x, mouse_y)
+        drift_offset = drift_sim.get_offset()
         
-        raw_point, ma_point, exp_point = smoother.add_sample(
+        raw_point, ma_point, exp_point, drift_point = smoother.add_sample(
             mouse_x,
             mouse_y,
             store_history=history_enabled,
+            drift_offset=drift_offset,
         )
 
         current_fps = clock.get_fps()
@@ -143,6 +147,7 @@ def main() -> None:
             raw_point,
             ma_point,
             exp_point,
+            drift_point,
             view_transform,
             visibility,
             metrics,

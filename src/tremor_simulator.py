@@ -89,6 +89,9 @@ class DriftSimulator:
 
         return x + self._offset_x, y + self._offset_y
 
+    def get_offset(self) -> Tuple[float, float]:
+        return self._offset_x, self._offset_y
+
     def set_enabled(self, enabled: bool) -> None:
         self.enabled = enabled
         if enabled:

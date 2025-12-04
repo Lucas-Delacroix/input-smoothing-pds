@@ -9,6 +9,7 @@ from config import (
     DEFAULT_RAW_VISIBLE,
     DEFAULT_MA_VISIBLE,
     DEFAULT_EXP_VISIBLE,
+     DEFAULT_DRIFT_VISIBLE,
     METRICS_HISTORY_SIZE,
 )
 
@@ -41,6 +42,7 @@ class VisibilityState:
     raw_visible: bool = DEFAULT_RAW_VISIBLE
     ma_visible: bool = DEFAULT_MA_VISIBLE
     exp_visible: bool = DEFAULT_EXP_VISIBLE
+    drift_visible: bool = DEFAULT_DRIFT_VISIBLE
 
 
 @dataclass
@@ -84,4 +86,3 @@ class ParamChangeIndicator:
             if self.timer <= 0:
                 self.active = False
                 self.timer = 0
-

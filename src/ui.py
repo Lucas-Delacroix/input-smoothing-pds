@@ -10,6 +10,8 @@ from config import (
     CURSOR_EXP_COLOR,
     CURSOR_MA_COLOR,
     CURSOR_RAW_COLOR,
+    CURSOR_DRIFT_COLOR,
+    DRIFT_CORRECTED_COLOR,
     EXP_COLOR,
     HUD_FONT,
     HUD_FONT_SIZE,
@@ -122,6 +124,9 @@ def _handle_key(
     if key == pygame.K_3:
         visibility.exp_visible = not visibility.exp_visible
         return None
+    if key == pygame.K_4:
+        visibility.drift_visible = not visibility.drift_visible
+        return None
 
     if key == pygame.K_F11:
         return (history_enabled, not fullscreen, False)
@@ -168,6 +173,15 @@ def _draw_traces(
             points,
             SMOOTH_LINE_WIDTH,
         )
+    if visibility.drift_visible and len(smoother.drift_corrected_trace) > 1:
+        points = smoother.drift_corrected_trace.as_int_tuples()
+        pygame.draw.lines(
+            screen,
+            DRIFT_CORRECTED_COLOR,
+            False,
+            points,
+            SMOOTH_LINE_WIDTH,
+        )
 
 
 def _draw_markers(
@@ -175,6 +189,7 @@ def _draw_markers(
     raw_point: Point,
     ma_point: Optional[Point],
     exp_point: Point,
+    drift_point: Optional[Point],
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
@@ -189,6 +204,9 @@ def _draw_markers(
     if visibility.exp_visible:
         x, y = exp_point.as_int_tuple()
         pygame.draw.circle(screen, CURSOR_EXP_COLOR, (x, y), MARKER_RADIUS)
+    if visibility.drift_visible and drift_point is not None:
+        x, y = drift_point.as_int_tuple()
+        pygame.draw.circle(screen, CURSOR_DRIFT_COLOR, (x, y), MARKER_RADIUS)
 
 
 
@@ -235,12 +253,13 @@ def _draw_hud(
         f"  Raw (1): {'ON' if visibility.raw_visible else 'OFF'}",
         f"  MA (2): {'ON' if visibility.ma_visible else 'OFF'}",
         f"  Exp (3): {'ON' if visibility.exp_visible else 'OFF'}",
+        f"  Drift corr. (4): {'ON' if visibility.drift_visible else 'OFF'}",
         "",
         "Controles:",
         "  UP / DOWN    -> aumenta/diminui N",
         "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
         "  H            -> liga/desliga histórico",
-        "  1, 2, 3      -> toggle visibilidade",
+        "  1, 2, 3, 4   -> toggle visibilidade",
         "  F11          -> tela cheia",
         "  G            -> gerar gráfico 3D",
         "  CTRL+SPACE    -> configurar tremor",
@@ -264,6 +283,7 @@ def render_frame(
     raw_point: Point,
     ma_point: Optional[Point],
     exp_point: Point,
+    drift_point: Optional[Point],
     transform: ViewTransform,
     visibility: VisibilityState,
     metrics: MetricsTracker,
@@ -278,7 +298,7 @@ def render_frame(
     if history_enabled:
         _draw_traces(screen, smoother, transform, visibility)
     
-    _draw_markers(screen, raw_point, ma_point, exp_point, transform, visibility)
+    _draw_markers(screen, raw_point, ma_point, exp_point, drift_point, transform, visibility)
     _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim, drift_sim)
     _draw_param_change_indicator(screen, font, param_indicator)
     
