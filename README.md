@@ -40,6 +40,7 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
 
 ### Novos Controles de Visualização
 - `1`, `2`, `3`: toggle de visibilidade das linhas (Raw, Moving Average, Exponential Smoothing).
+- `4`: toggle da linha de correção de drift (Drift corr.).
 - `Scroll do Mouse`: zoom in/out.
 - `Botão do Meio do Mouse` (arrastar): pan (mover a visualização).
 - `R`: reset zoom e pan.
@@ -57,6 +58,7 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
 - **Linha vermelha**: pontos brutos do mouse (com tremor aplicado se habilitado).
 - **Linha verde**: média móvel dos pontos.
 - **Linha azul**: suavização exponencial (IIR).
+ - **Linha amarela**: sinal corrigido de drift (remove apenas o drift artificial constante estimado pelo simulador, preservando os movimentos do usuário).
 - **Círculos**: indicam a posição atual de cada série.
 - **HUD**: mostra os parâmetros ativos, controles, estado de visibilidade e status do tremor/drift.
 - **Gráfico de Métricas** (canto superior direito): mostra FPS e latência em tempo real.
