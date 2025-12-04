@@ -3,14 +3,12 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+from filter_metadata import FILTERS
 from input_device import InputSmoother
 
 
 def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None) -> None:
     raw_points = list(smoother.raw_trace)
-    ma_points = list(smoother.moving_average_trace)
-    exp_points = list(smoother.exp_trace)
-    drift_points = list(getattr(smoother, "drift_corrected_trace", []))
 
     if not raw_points:
         print("Nenhum dado disponível para plotar.")
@@ -21,35 +19,27 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
 
     time_steps = np.arange(len(raw_points))
 
-    raw_x = [p.x for p in raw_points]
-    raw_y = [p.y for p in raw_points]
+    for descriptor in FILTERS:
+        trace = getattr(smoother, descriptor.trace_attr, None)
+        if trace is None:
+            continue
+        points = list(trace)
+        if not points:
+            continue
 
-    ma_x = [p.x for p in ma_points] if ma_points else []
-    ma_y = [p.y for p in ma_points] if ma_points else []
+        xs = [p.x for p in points]
+        ys = [p.y for p in points]
+        zs = time_steps[: len(xs)]
 
-    exp_x = [p.x for p in exp_points]
-    exp_y = [p.y for p in exp_points]
-
-    drift_x = [p.x for p in drift_points] if drift_points else []
-    drift_y = [p.y for p in drift_points] if drift_points else []
-
-    if raw_x and raw_y:
-        ax.plot(raw_x, raw_y, time_steps, 
-                color='red', linewidth=1, alpha=0.6, label='Raw Input')
-
-    if ma_x and ma_y and len(ma_x) == len(time_steps[:len(ma_x)]):
-        ma_time = time_steps[:len(ma_x)]
-        ax.plot(ma_x, ma_y, ma_time,
-                color='green', linewidth=2, alpha=0.8, label='Moving Average')
-
-    if exp_x and exp_y:
-        ax.plot(exp_x, exp_y, time_steps,
-                color='blue', linewidth=2, alpha=0.8, label='Exponential Smoothing')
-
-    if drift_x and drift_y:
-        drift_time = time_steps[:len(drift_x)]
-        ax.plot(drift_x, drift_y, drift_time,
-                color='gold', linewidth=2, alpha=0.9, label='Drift Corrected')
+        ax.plot(
+            xs,
+            ys,
+            zs,
+            color=descriptor.mpl_color,
+            linewidth=descriptor.line_width,
+            alpha=0.8,
+            label=descriptor.name,
+        )
 
     ax.set_xlabel('X Position', fontsize=10)
     ax.set_ylabel('Y Position', fontsize=10)
@@ -74,31 +64,22 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
 
 def generate_3d_surface_map(smoother: InputSmoother, output_path: Optional[str] = None) -> None:
     raw_points = list(smoother.raw_trace)
-    ma_points = list(smoother.moving_average_trace)
-    exp_points = list(smoother.exp_trace)
-    drift_points = list(getattr(smoother, "drift_corrected_trace", []))
-    
+
     if not raw_points or len(raw_points) < 10:
         print("Dados insuficientes para gerar mapa de superfície.")
         return
 
     fig = plt.figure(figsize=(16, 12))
-    
-    # Raw
-    ax1 = fig.add_subplot(221, projection='3d')
-    _plot_density_map(ax1, raw_points, 'Raw Input Density Map', 'Reds')
-    
-    # Moving Average
-    ax2 = fig.add_subplot(222, projection='3d')
-    _plot_density_map(ax2, ma_points, 'Moving Average Density Map', 'Greens')
-    
-    # Exponential Smoothing
-    ax3 = fig.add_subplot(223, projection='3d')
-    _plot_density_map(ax3, exp_points, 'Exponential Smoothing Density Map', 'Blues')
-    
-    # Drift Corrected
-    ax4 = fig.add_subplot(224, projection='3d')
-    _plot_density_map(ax4, drift_points, 'Drift Corrected Density Map', 'YlOrBr')
+
+    cols = 2
+    rows = (len(FILTERS) + cols - 1) // cols
+
+    for index, descriptor in enumerate(FILTERS, start=1):
+        ax = fig.add_subplot(rows, cols, index, projection="3d")
+        trace = getattr(smoother, descriptor.trace_attr, None)
+        points = list(trace) if trace is not None else []
+        title = f"{descriptor.name} Density Map"
+        _plot_density_map(ax, points, title, descriptor.density_cmap)
 
     plt.tight_layout()
 

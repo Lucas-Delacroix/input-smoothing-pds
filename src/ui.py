@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 import time
 import os
 
@@ -7,12 +7,6 @@ import pygame
 from config import (
     ALPHA_STEP,
     BACKGROUND_COLOR,
-    CURSOR_EXP_COLOR,
-    CURSOR_MA_COLOR,
-    CURSOR_RAW_COLOR,
-    CURSOR_DRIFT_COLOR,
-    DRIFT_CORRECTED_COLOR,
-    EXP_COLOR,
     HUD_FONT,
     HUD_FONT_SIZE,
     HUD_LINE_HEIGHT,
@@ -20,16 +14,13 @@ from config import (
     HUD_MARGIN_Y,
     HUD_TEXT_COLOR,
     MARKER_RADIUS,
-    MOVING_AVERAGE_COLOR,
     PARAM_CHANGE_COLOR,
     PARAM_CHANGE_INDICATOR_DURATION,
-    RAW_COLOR,
-    RAW_LINE_WIDTH,
-    SMOOTH_LINE_WIDTH,
     TITLE,
     WINDOW_HEIGHT,
     WINDOW_WIDTH,
 )
+from filter_metadata import FILTERS, KEY_TO_FILTER_ID
 from input_device import InputSmoother, Point
 from ui_state import (
     MetricsTracker,
@@ -115,17 +106,10 @@ def _handle_key(
             smoother.clear_history()
         return (not history_enabled, fullscreen, False)
 
-    if key == pygame.K_1:
-        visibility.raw_visible = not visibility.raw_visible
-        return None
-    if key == pygame.K_2:
-        visibility.ma_visible = not visibility.ma_visible
-        return None
-    if key == pygame.K_3:
-        visibility.exp_visible = not visibility.exp_visible
-        return None
-    if key == pygame.K_4:
-        visibility.drift_visible = not visibility.drift_visible
+    filter_id = KEY_TO_FILTER_ID.get(key)
+    if filter_id is not None:
+        current = visibility.is_visible(filter_id)
+        visibility.set_visible(filter_id, not current)
         return None
 
     if key == pygame.K_F11:
@@ -144,69 +128,38 @@ def _draw_traces(
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    if visibility.raw_visible and len(smoother.raw_trace) > 1:
-        points = smoother.raw_trace.as_int_tuples()
-        pygame.draw.lines(
-            screen,
-            RAW_COLOR,
-            False,
-            points,
-            RAW_LINE_WIDTH,
-        )
+    for descriptor in FILTERS:
+        if not visibility.is_visible(descriptor.id):
+            continue
 
-    if visibility.ma_visible and len(smoother.moving_average_trace) > 1:
-        points = smoother.moving_average_trace.as_int_tuples()
-        pygame.draw.lines(
-            screen,
-            MOVING_AVERAGE_COLOR,
-            False,
-            points,
-            SMOOTH_LINE_WIDTH,
-        )
+        trace = getattr(smoother, descriptor.trace_attr, None)
+        if trace is None or len(trace) <= 1:
+            continue
 
-    if visibility.exp_visible and len(smoother.exp_trace) > 1:
-        points = smoother.exp_trace.as_int_tuples()
+        points = trace.as_int_tuples()
         pygame.draw.lines(
             screen,
-            EXP_COLOR,
+            descriptor.color,
             False,
             points,
-            SMOOTH_LINE_WIDTH,
-        )
-    if visibility.drift_visible and len(smoother.drift_corrected_trace) > 1:
-        points = smoother.drift_corrected_trace.as_int_tuples()
-        pygame.draw.lines(
-            screen,
-            DRIFT_CORRECTED_COLOR,
-            False,
-            points,
-            SMOOTH_LINE_WIDTH,
+            descriptor.line_width,
         )
 
 
 def _draw_markers(
     screen: pygame.Surface,
-    raw_point: Point,
-    ma_point: Optional[Point],
-    exp_point: Point,
-    drift_point: Optional[Point],
+    points_by_filter: Dict[str, Optional[Point]],
     transform: ViewTransform,
     visibility: VisibilityState,
 ) -> None:
-    if visibility.raw_visible:
-        x, y = raw_point.as_int_tuple()
-        pygame.draw.circle(screen, CURSOR_RAW_COLOR, (x, y), MARKER_RADIUS)
-
-    if visibility.ma_visible and ma_point is not None:
-        x, y = ma_point.as_int_tuple()
-        pygame.draw.circle(screen, CURSOR_MA_COLOR, (x, y), MARKER_RADIUS)
-
-    if visibility.exp_visible:
-        x, y = exp_point.as_int_tuple()
-        pygame.draw.circle(screen, CURSOR_EXP_COLOR, (x, y), MARKER_RADIUS)
-    if visibility.drift_visible and drift_point is not None:
-        x, y = drift_point.as_int_tuple()
-        pygame.draw.circle(screen, CURSOR_DRIFT_COLOR, (x, y), MARKER_RADIUS)
+    for descriptor in FILTERS:
+        if not visibility.is_visible(descriptor.id):
+            continue
+        point = points_by_filter.get(descriptor.id)
+        if point is None:
+            continue
+        x, y = point.as_int_tuple()
+        pygame.draw.circle(screen, descriptor.cursor_color, (x, y), MARKER_RADIUS)
 
 
 
@@ -250,22 +203,32 @@ def _draw_hud(
         f"Drift artificial: {'ON' if drift_sim.enabled else 'OFF'} "
         f"({drift_sim.pixels_per_second:.1f}px/s, Dir: {drift_sim.direction_deg:.0f}°)",
         f"Visibilidade:",
-        f"  Raw (1): {'ON' if visibility.raw_visible else 'OFF'}",
-        f"  MA (2): {'ON' if visibility.ma_visible else 'OFF'}",
-        f"  Exp (3): {'ON' if visibility.exp_visible else 'OFF'}",
-        f"  Drift corr. (4): {'ON' if visibility.drift_visible else 'OFF'}",
-        "",
-        "Controles:",
-        "  UP / DOWN    -> aumenta/diminui N",
-        "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
-        "  H            -> liga/desliga histórico",
-        "  1, 2, 3, 4   -> toggle visibilidade",
-        "  F11          -> tela cheia",
-        "  G            -> gerar gráfico 3D",
-        "  CTRL+SPACE    -> configurar tremor",
-        "  CTRL+D        -> configurar drift",
-        "  ESC          -> sair",
     ]
+
+    for descriptor in FILTERS:
+        visible = visibility.is_visible(descriptor.id)
+        status = "ON" if visible else "OFF"
+        lines.append(
+            f"  {descriptor.name} ({descriptor.key_hint}): {status}"
+        )
+
+    toggle_keys = ", ".join(f.key_hint for f in FILTERS)
+
+    lines.extend(
+        [
+            "",
+            "Controles:",
+            "  UP / DOWN    -> aumenta/diminui N",
+            "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
+            "  H            -> liga/desliga histórico",
+            f"  {toggle_keys:<12} -> toggle visibilidade",
+            "  F11          -> tela cheia",
+            "  G            -> gerar gráfico 3D",
+            "  CTRL+SPACE    -> configurar tremor",
+            "  CTRL+D        -> configurar drift",
+            "  ESC          -> sair",
+        ]
+    )
 
     x, y = HUD_MARGIN_X, HUD_MARGIN_Y
     for line in lines:
@@ -297,8 +260,15 @@ def render_frame(
     
     if history_enabled:
         _draw_traces(screen, smoother, transform, visibility)
-    
-    _draw_markers(screen, raw_point, ma_point, exp_point, drift_point, transform, visibility)
+
+    points_by_filter: Dict[str, Optional[Point]] = {
+        "raw": raw_point,
+        "ma": ma_point,
+        "exp": exp_point,
+        "drift": drift_point,
+    }
+
+    _draw_markers(screen, points_by_filter, transform, visibility)
     _draw_hud(screen, font, smoother, history_enabled, visibility, transform, fullscreen, tremor_sim, drift_sim)
     _draw_param_change_indicator(screen, font, param_indicator)
     

@@ -1,17 +1,14 @@
 from dataclasses import dataclass
 from collections import deque
-from typing import Deque
+from typing import Deque, Dict
 
 from config import (
     ZOOM_DEFAULT,
     ZOOM_MIN,
     ZOOM_MAX,
-    DEFAULT_RAW_VISIBLE,
-    DEFAULT_MA_VISIBLE,
-    DEFAULT_EXP_VISIBLE,
-     DEFAULT_DRIFT_VISIBLE,
     METRICS_HISTORY_SIZE,
 )
+from filter_metadata import FILTERS
 
 
 @dataclass
@@ -37,12 +34,17 @@ class ViewTransform:
             self.zoom = self.target_zoom
 
 
-@dataclass
 class VisibilityState:
-    raw_visible: bool = DEFAULT_RAW_VISIBLE
-    ma_visible: bool = DEFAULT_MA_VISIBLE
-    exp_visible: bool = DEFAULT_EXP_VISIBLE
-    drift_visible: bool = DEFAULT_DRIFT_VISIBLE
+    def __init__(self) -> None:
+        self._filters: Dict[str, bool] = {
+            f.id: f.visibility_default for f in FILTERS
+        }
+
+    def is_visible(self, filter_id: str) -> bool:
+        return self._filters.get(filter_id, True)
+
+    def set_visible(self, filter_id: str, visible: bool) -> None:
+        self._filters[filter_id] = visible
 
 
 @dataclass
