@@ -10,6 +10,7 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
     raw_points = list(smoother.raw_trace)
     ma_points = list(smoother.moving_average_trace)
     exp_points = list(smoother.exp_trace)
+    drift_points = list(getattr(smoother, "drift_corrected_trace", []))
 
     if not raw_points:
         print("Nenhum dado disponível para plotar.")
@@ -29,6 +30,9 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
     exp_x = [p.x for p in exp_points]
     exp_y = [p.y for p in exp_points]
 
+    drift_x = [p.x for p in drift_points] if drift_points else []
+    drift_y = [p.y for p in drift_points] if drift_points else []
+
     if raw_x and raw_y:
         ax.plot(raw_x, raw_y, time_steps, 
                 color='red', linewidth=1, alpha=0.6, label='Raw Input')
@@ -41,6 +45,11 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
     if exp_x and exp_y:
         ax.plot(exp_x, exp_y, time_steps,
                 color='blue', linewidth=2, alpha=0.8, label='Exponential Smoothing')
+
+    if drift_x and drift_y:
+        drift_time = time_steps[:len(drift_x)]
+        ax.plot(drift_x, drift_y, drift_time,
+                color='gold', linewidth=2, alpha=0.9, label='Drift Corrected')
 
     ax.set_xlabel('X Position', fontsize=10)
     ax.set_ylabel('Y Position', fontsize=10)
@@ -65,40 +74,31 @@ def generate_3d_plot(smoother: InputSmoother, output_path: Optional[str] = None)
 
 def generate_3d_surface_map(smoother: InputSmoother, output_path: Optional[str] = None) -> None:
     raw_points = list(smoother.raw_trace)
+    ma_points = list(smoother.moving_average_trace)
+    exp_points = list(smoother.exp_trace)
+    drift_points = list(getattr(smoother, "drift_corrected_trace", []))
     
     if not raw_points or len(raw_points) < 10:
         print("Dados insuficientes para gerar mapa de superfície.")
         return
 
-    fig = plt.figure(figsize=(14, 10))
+    fig = plt.figure(figsize=(16, 12))
     
+    # Raw
     ax1 = fig.add_subplot(221, projection='3d')
     _plot_density_map(ax1, raw_points, 'Raw Input Density Map', 'Reds')
     
-    if smoother.moving_average_trace:
-        ma_points = list(smoother.moving_average_trace)
-        ax2 = fig.add_subplot(222, projection='3d')
-        _plot_density_map(ax2, ma_points, 'Moving Average Density Map', 'Greens')
+    # Moving Average
+    ax2 = fig.add_subplot(222, projection='3d')
+    _plot_density_map(ax2, ma_points, 'Moving Average Density Map', 'Greens')
     
-    exp_points = list(smoother.exp_trace)
+    # Exponential Smoothing
     ax3 = fig.add_subplot(223, projection='3d')
     _plot_density_map(ax3, exp_points, 'Exponential Smoothing Density Map', 'Blues')
     
+    # Drift Corrected
     ax4 = fig.add_subplot(224, projection='3d')
-    time_steps = np.arange(len(raw_points))
-    raw_x = [p.x for p in raw_points]
-    raw_y = [p.y for p in raw_points]
-    exp_x = [p.x for p in exp_points]
-    exp_y = [p.y for p in exp_points]
-    
-    ax4.plot(raw_x, raw_y, time_steps, 'r-', alpha=0.3, linewidth=1, label='Raw')
-    ax4.plot(exp_x, exp_y, time_steps, 'b-', alpha=0.7, linewidth=2, label='Smoothed')
-    ax4.set_xlabel('X')
-    ax4.set_ylabel('Y')
-    ax4.set_zlabel('Time')
-    ax4.set_title('Raw vs Smoothed Comparison')
-    ax4.legend()
-    ax4.view_init(elev=20, azim=45)
+    _plot_density_map(ax4, drift_points, 'Drift Corrected Density Map', 'YlOrBr')
 
     plt.tight_layout()
 
@@ -149,4 +149,3 @@ def _plot_density_map(ax, points, title, colormap):
     ax.set_title(title)
     ax.view_init(elev=30, azim=45)
     ax.figure.colorbar(surf, ax=ax, shrink=0.5)
-
