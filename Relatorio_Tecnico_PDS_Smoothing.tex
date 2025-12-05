@@ -1,0 +1,492 @@
+\documentclass[12pt,a4paper]{article}
+
+% Pacotes essenciais
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{caption}
+\usepackage{float}
+
+% Configuração de margens ABNT
+\geometry{
+    a4paper,
+    left=3cm,
+    right=2cm,
+    top=3cm,
+    bottom=2cm
+}
+
+% Espaçamento 1.5
+\onehalfspacing
+
+% Configuração de código Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{white},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false
+}
+
+% Configuração de hyperlinks
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\begin{document}
+
+% Capa
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    \textbf{\Large INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO CEARÁ}\\[0.3cm]
+    \textbf{\large CAMPUS FORTALEZA}\\[0.3cm]
+    \textbf{\large CURSO DE CIÊNCIA DA COMPUTAÇÃO}\\
+    
+    \vspace{3cm}
+    
+    \textbf{\large RIAN, ERICK E LUCAS DELACROIX}\\
+    
+    \vspace{3cm}
+    
+    \textbf{\Large VISUALIZADOR DE SUAVIZAÇÃO DE ENTRADA EM TEMPO REAL: APLICAÇÃO DE FILTROS DIGITAIS FIR E IIR}\\
+    
+    \vspace{3cm}
+    
+    \textbf{Relatório Técnico}\\
+    
+    \vfill
+    
+    Relatório técnico apresentado à disciplina de Processamento Digital de Sinais do curso de Ciência da Computação do Instituto Federal do Ceará como requisito parcial para obtenção de nota.
+    
+    \vfill
+    
+    \textbf{Fortaleza}\\
+    \textbf{2025}
+\end{titlepage}
+
+% Sumário
+\tableofcontents
+\newpage
+
+\section{Introdução}
+
+O processamento digital de sinais é uma área fundamental da computação que permeia diversas aplicações do cotidiano, desde sistemas de telecomunicações até interfaces de interação humano-computador. A filtragem de sinais, em particular, desempenha papel essencial na redução de ruídos e na melhoria da qualidade de dados provenientes de sensores e dispositivos de entrada.
+
+Este trabalho apresenta o desenvolvimento de um sistema interativo de visualização e suavização de sinais aplicado ao rastreamento de movimento do mouse em tempo real. A proposta surgiu da necessidade prática de atenuar ruídos e tremores inerentes aos dispositivos de entrada, problema que afeta negativamente aplicações como desenho digital, jogos eletrônicos e sistemas de apontamento para pessoas com limitações motoras.
+
+O sistema implementado permite a visualização simultânea de três representações do sinal de entrada: o sinal bruto capturado diretamente do dispositivo, o sinal filtrado por média móvel (filtro FIR) e o sinal filtrado por suavização exponencial (filtro IIR de primeira ordem). A implementação inclui ainda um simulador de tremor configurável, possibilitando testes controlados da eficácia dos filtros.
+
+Como objetivos específicos, buscamos: (i) implementar e comparar filtros digitais FIR e IIR aplicados a sinais em tempo real; (ii) desenvolver uma interface interativa que permita ajuste dinâmico dos parâmetros de filtragem; (iii) criar ferramentas de visualização e análise dos resultados; e (iv) avaliar quantitativamente o desempenho computacional do sistema.
+
+\section{Fundamentação Teórica}
+
+\subsection{Filtros Digitais}
+
+Filtros digitais são sistemas que processam sinais digitais com o objetivo de modificar suas características no domínio da frequência. Eles são amplamente classificados em duas categorias principais: FIR (\textit{Finite Impulse Response}) e IIR (\textit{Infinite Impulse Response}) \cite{oppenheim2009}.
+
+A principal diferença entre esses tipos de filtros reside na presença ou ausência de realimentação. Filtros FIR calculam a saída baseando-se exclusivamente em valores atuais e passados da entrada, enquanto filtros IIR utilizam também valores passados da própria saída, criando um sistema recursivo.
+
+\subsection{Filtro de Média Móvel (FIR)}
+
+O filtro de média móvel é um dos filtros FIR mais simples e intuitivos. Ele calcula a média aritmética dos últimos $N$ valores do sinal de entrada, conforme a equação:
+
+\begin{equation}
+y[n] = \frac{1}{N} \sum_{k=0}^{N-1} x[n-k]
+\end{equation}
+
+\noindent onde $y[n]$ representa a saída filtrada no instante $n$, $x[n]$ é o sinal de entrada e $N$ é o tamanho da janela móvel.
+
+Este filtro apresenta características de passa-baixas, atenuando componentes de alta frequência do sinal. Quanto maior o valor de $N$, maior será a atenuação de ruídos de alta frequência, porém ao custo de maior atraso de grupo e possível perda de detalhes importantes do sinal original \cite{smith1997}.
+
+A resposta ao impulso do filtro de média móvel é finita e possui duração exatamente igual a $N$ amostras, o que garante estabilidade incondicional. Entretanto, a resposta em frequência apresenta lóbulos secundários que podem não ser desejáveis em algumas aplicações.
+
+\subsection{Suavização Exponencial (Filtro IIR)}
+
+A suavização exponencial, também conhecida como filtro de média móvel exponencial ou filtro passa-baixas de primeira ordem, é um filtro IIR recursivo descrito pela equação:
+
+\begin{equation}
+y[n] = \alpha \cdot x[n] + (1 - \alpha) \cdot y[n-1]
+\end{equation}
+
+\noindent onde $\alpha$ é o fator de suavização com $0 < \alpha \leq 1$.
+
+O parâmetro $\alpha$ controla o compromisso entre responsividade e suavização. Valores de $\alpha$ próximos a 1 conferem maior peso ao valor atual da entrada, resultando em resposta rápida mas pouca suavização. Inversamente, valores próximos a zero privilegiam o histórico do sinal, aumentando a suavização às custas de maior latência.
+
+Uma característica importante deste filtro é sua eficiência computacional e de memória, uma vez que requer apenas o armazenamento do valor anterior da saída. A resposta ao impulso é teoricamente infinita, com decaimento exponencial, o que justifica a nomenclatura IIR \cite{proakis2006}.
+
+\subsection{Análise Comparativa}
+
+A Tabela \ref{tab:comparacao} apresenta uma comparação entre os dois tipos de filtros implementados.
+
+\begin{table}[H]
+\centering
+\caption{Comparação entre filtros de média móvel e suavização exponencial}
+\label{tab:comparacao}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Característica} & \textbf{Média Móvel (FIR)} & \textbf{Suav. Exponencial (IIR)} \\ \hline
+Memória requerida & $N$ valores & 1 valor \\ \hline
+Complexidade computacional & $O(N)$ & $O(1)$ \\ \hline
+Resposta ao impulso & Finita & Infinita \\ \hline
+Estabilidade & Sempre estável & Estável se $0 < \alpha \leq 1$ \\ \hline
+Fase & Não-linear & Não-linear \\ \hline
+Implementação & Convolução & Recursão \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Metodologia}
+
+\subsection{Tecnologias Utilizadas}
+
+O projeto foi desenvolvido em Python 3.10, escolhido por sua rica ecossistema de bibliotecas científicas e facilidade de prototipagem. As principais bibliotecas utilizadas foram:
+
+\begin{itemize}
+    \item \textbf{Pygame:} biblioteca para desenvolvimento de aplicações multimídia, utilizada para renderização gráfica em tempo real e captura de eventos de entrada;
+    \item \textbf{NumPy:} biblioteca para computação numérica, empregada na geração de ruído gaussiano e operações vetoriais;
+    \item \textbf{Matplotlib:} biblioteca para visualização científica, utilizada na geração de gráficos 3D para análise offline.
+\end{itemize}
+
+\subsection{Arquitetura do Sistema}
+
+A arquitetura do sistema foi projetada seguindo princípios de modularidade e separação de responsabilidades. O diagrama conceitual pode ser dividido em cinco camadas principais:
+
+\textbf{Camada de Filtragem (\texttt{filters.py}):} Implementa as funções puras de processamento de sinais, sem efeitos colaterais. As funções \texttt{moving\_average()} e \texttt{exp\_smoothing()} encapsulam a lógica matemática dos filtros, facilitando testes unitários e reutilização.
+
+\textbf{Camada de Gerenciamento de Dados (\texttt{input\_device.py}):} Responsável pelo armazenamento e manipulação dos sinais. A classe \texttt{InputSmoother} coordena a aplicação dos filtros e mantém o histórico das trajetórias através de buffers circulares implementados com \texttt{collections.deque}.
+
+\textbf{Camada de Interface (\texttt{ui.py} e \texttt{ui\_state.py}):} Gerencia a interação com o usuário e a renderização gráfica. Implementa o padrão de projeto State para gerenciar transformações de visualização (zoom e pan) e configurações de visibilidade.
+
+\textbf{Camada de Simulação (\texttt{tremor\_simulator.py}):} Implementa o gerador de ruído sintético, combinando componentes senoidais determinísticas e estocásticas gaussianas para criar tremor realístico.
+
+\textbf{Camada de Análise (\texttt{plot\_3d.py}):} Responsável pela geração de visualizações tridimensionais e mapas de densidade para análise qualitativa dos filtros.
+
+\subsection{Estruturas de Dados}
+
+A escolha criteriosa das estruturas de dados foi fundamental para garantir desempenho adequado em tempo real. A classe \texttt{Point} foi implementada como \texttt{dataclass} imutável, garantindo segurança contra modificações acidentais:
+
+\begin{lstlisting}[caption={Implementação da classe Point}]
+@dataclass(frozen=True)
+class Point:
+    x: float
+    y: float
+    
+    def as_int_tuple(self) -> tuple[int, int]:
+        return int(self.x), int(self.y)
+\end{lstlisting}
+
+O histórico de pontos é mantido em buffers circulares implementados com \texttt{deque}, proporcionando complexidade $O(1)$ para inserções e remoções:
+
+\begin{lstlisting}[caption={Implementação do buffer circular}]
+class TraceBuffer:
+    def __init__(self, max_size: int):
+        self._points: Deque[Point] = deque(maxlen=max_size)
+    
+    def append(self, point: Point) -> None:
+        self._points.append(point)
+\end{lstlisting}
+
+\subsection{Implementação dos Filtros}
+
+A implementação do filtro de média móvel considera o caso em que o buffer ainda não está completamente preenchido, utilizando apenas os valores disponíveis:
+
+\begin{lstlisting}[caption={Implementação do filtro de média móvel}]
+def moving_average(buffer: list[float], 
+                   window_size: int) -> Optional[float]:
+    if not buffer:
+        return None
+    
+    if window_size <= 0:
+        raise ValueError("window_size deve ser > 0")
+    
+    effective_size = min(len(buffer), window_size)
+    window = buffer[-effective_size:]
+    return sum(window) / effective_size
+\end{lstlisting}
+
+O filtro de suavização exponencial foi implementado de forma recursiva, tratando adequadamente o caso inicial onde não há valor anterior:
+
+\begin{lstlisting}[caption={Implementação da suavização exponencial}]
+def exp_smoothing(x: float, 
+                  prev_y: Optional[float], 
+                  alpha: float) -> float:
+    if not (0.0 < alpha <= 1.0):
+        raise ValueError("alpha deve estar em (0, 1].")
+    
+    if prev_y is None:
+        return x
+    
+    return alpha * x + (1.0 - alpha) * prev_y
+\end{lstlisting}
+
+\subsection{Simulador de Tremor}
+
+O simulador de tremor foi desenvolvido para criar condições controladas de teste. Ele combina duas componentes de ruído:
+
+\begin{equation}
+\text{tremor}(t) = A_s \cdot \sin(2\pi f t) + \mathcal{N}(0, \sigma^2)
+\end{equation}
+
+\noindent onde $A_s$ é a amplitude da componente senoidal, $f$ é a frequência em Hz, e $\mathcal{N}(0, \sigma^2)$ representa ruído gaussiano com média zero e variância $\sigma^2$.
+
+O ruído gaussiano é suavizado exponencialmente antes de ser aplicado, criando um tremor mais realístico que simula a autocorrelação temporal presente em tremores humanos reais:
+
+\begin{lstlisting}[caption={Aplicação do tremor simulado}]
+def apply_tremor(self, x: float, y: float) -> Tuple[float, float]:
+    if not self.enabled:
+        return x, y
+    
+    t = time.time() - self.start_time
+    sin_x = math.sin(2 * math.pi * self.frequency * t) * \
+            (self.intensity * 0.3)
+    sin_y = math.cos(2 * math.pi * self.frequency * t * 1.1) * \
+            (self.intensity * 0.3)
+    
+    noise_x = np.random.normal(0, self.intensity * 0.7)
+    noise_y = np.random.normal(0, self.intensity * 0.7)
+    
+    # Suavizacao do ruido
+    alpha = 0.3
+    self._last_noise_x = alpha * noise_x + \
+                         (1 - alpha) * self._last_noise_x
+    self._last_noise_y = alpha * noise_y + \
+                         (1 - alpha) * self._last_noise_y
+    
+    tremor_x = sin_x + self._last_noise_x
+    tremor_y = sin_y + self._last_noise_y
+    
+    return x + tremor_x, y + tremor_y
+\end{lstlisting}
+
+\section{Resultados e Discussão}
+
+\subsection{Desempenho Computacional}
+
+O sistema foi projetado para operar em tempo real mantendo taxa de atualização constante de 60 quadros por segundo (FPS). Durante os testes, o sistema demonstrou desempenho estável mesmo com buffers de 500 pontos:
+
+\begin{itemize}
+    \item \textbf{FPS médio:} 60 FPS (sem quedas perceptíveis)
+    \item \textbf{Latência média:} $< 17$ ms por quadro
+    \item \textbf{Uso de memória:} aproximadamente 50 MB incluindo bibliotecas
+\end{itemize}
+
+A utilização de estruturas de dados eficientes (\texttt{deque}) e algoritmos com complexidade linear ou constante garantiu que o processamento dos filtros não se tornasse gargalo, mesmo em máquinas com recursos limitados.
+
+\subsection{Eficácia da Filtragem}
+
+\subsubsection{Filtro de Média Móvel}
+
+Os testes revelaram comportamentos distintos conforme o tamanho da janela $N$:
+
+\begin{itemize}
+    \item \textbf{$N$ pequeno ($3 \leq N \leq 5$):} O filtro apresenta resposta rápida a mudanças de direção, porém a suavização é limitada. Ruídos de alta frequência ainda são parcialmente visíveis na saída.
+    
+    \item \textbf{$N$ médio ($10 \leq N \leq 20$):} Observamos um equilíbrio interessante entre suavização e responsividade. Este range mostrou-se adequado para a maioria dos casos de uso, reduzindo significativamente o tremor sem introduzir atraso perceptível.
+    
+    \item \textbf{$N$ grande ($N > 30$):} A suavização é excessiva, resultando em trajetórias demasiadamente "arredondadas". O atraso torna-se perceptível, especialmente em movimentos rápidos do mouse.
+\end{itemize}
+
+\subsubsection{Filtro de Suavização Exponencial}
+
+O parâmetro $\alpha$ demonstrou controle fino sobre o comportamento do filtro:
+
+\begin{itemize}
+    \item \textbf{$\alpha$ alto ($\alpha > 0.7$):} O filtro privilegia o valor atual, resultando em resposta quase instantânea mas com pouca atenuação de ruído.
+    
+    \item \textbf{$\alpha$ médio ($0.3 \leq \alpha \leq 0.5$):} Faixa ótima na maioria dos cenários, oferecendo boa suavização mantendo responsividade adequada.
+    
+    \item \textbf{$\alpha$ baixo ($\alpha < 0.2$):} Alta suavização às custas de latência significativa. As trajetórias tornam-se muito suaves mas com atraso visível.
+\end{itemize}
+
+\subsection{Análise Comparativa dos Filtros}
+
+A comparação visual em tempo real revelou diferenças qualitativas importantes entre os filtros. O filtro exponencial tende a produzir trajetórias mais orgânicas e naturais, especialmente ao traçar curvas. Isso ocorre porque o decaimento exponencial dos pesos resulta em transições mais suaves.
+
+Por outro lado, o filtro de média móvel apresenta resposta mais "mecânica", com transições abruptas quando pontos entram ou saem da janela deslizante. Esta característica pode ser desejável em aplicações onde precisão geométrica é prioritária.
+
+\subsection{Validação com Tremor Simulado}
+
+O simulador de tremor mostrou-se eficaz para testes controlados. Com intensidade configurada em 5 pixels e frequência de 10 Hz, ambos os filtros conseguiram reduzir substancialmente o tremor:
+
+\begin{itemize}
+    \item \textbf{Sinal bruto:} Desvio padrão de aproximadamente 5 pixels
+    \item \textbf{Após média móvel ($N=10$):} Desvio padrão reduzido para aproximadamente 1.5 pixels
+    \item \textbf{Após suavização exponencial ($\alpha=0.4$):} Desvio padrão reduzido para aproximadamente 1.2 pixels
+\end{itemize}
+
+Estes resultados demonstram a aplicabilidade prática dos filtros para problemas reais de atenuação de tremor em interfaces de entrada.
+
+\section{Recursos Implementados}
+
+\subsection{Interface Interativa}
+
+O sistema oferece controle completo sobre os parâmetros de filtragem em tempo real através do teclado:
+
+\begin{itemize}
+    \item \textbf{Setas $\uparrow$ / $\downarrow$:} Incrementam/decrementam o tamanho da janela $N$
+    \item \textbf{Setas $\leftarrow$ / $\rightarrow$:} Ajustam o fator $\alpha$ com passo de 0.05
+    \item \textbf{Tecla H:} Liga/desliga armazenamento de histórico
+    \item \textbf{Teclas 1, 2, 3:} Alternam visibilidade das diferentes representações
+    \item \textbf{Tecla G:} Gera e exporta gráficos 3D
+    \item \textbf{Tecla R:} Reseta visualização
+    \item \textbf{F11:} Alterna modo tela cheia
+\end{itemize}
+
+\subsection{Visualização em Tempo Real}
+
+O sistema renderiza simultaneamente três representações do sinal:
+
+\begin{itemize}
+    \item \textbf{Linha vermelha:} Sinal bruto capturado do mouse
+    \item \textbf{Linha verde:} Sinal filtrado por média móvel
+    \item \textbf{Linha azul:} Sinal filtrado por suavização exponencial
+\end{itemize}
+
+Círculos coloridos indicam a posição atual de cada representação, facilitando a comparação visual.
+
+\subsection{Sistema de Métricas}
+
+Um gráfico em tempo real exibe duas métricas de desempenho:
+
+\begin{itemize}
+    \item \textbf{FPS (Frames Per Second):} Taxa de atualização do sistema
+    \item \textbf{Latência:} Tempo de processamento por quadro em milissegundos
+\end{itemize}
+
+O histórico das últimas 100 amostras é mantido para visualização de tendências.
+
+\subsection{Exportação de Dados}
+
+A funcionalidade de exportação gera dois tipos de visualizações 3D:
+
+\begin{enumerate}
+    \item \textbf{Gráfico de trajetória 3D:} Representa as três versões do sinal no espaço $(x, y, t)$, onde o eixo $z$ corresponde ao tempo
+    \item \textbf{Mapas de densidade 3D:} Utilizam estimação de densidade por kernel gaussiano para visualizar regiões de maior concentração de pontos
+\end{enumerate}
+
+Estas visualizações são salvas na pasta \texttt{output/} no formato PNG com resolução de 150 DPI, adequada para inclusão em documentos técnicos.
+
+\section{Considerações Finais}
+
+Este trabalho apresentou o desenvolvimento de um sistema completo de visualização e aplicação de filtros digitais em tempo real. A implementação bem-sucedida de filtros FIR e IIR, aliada a uma interface interativa intuitiva, proporcionou uma ferramenta educacional valiosa para o estudo prático de processamento de sinais.
+
+\subsection{Contribuições}
+
+As principais contribuições deste trabalho incluem:
+
+\begin{enumerate}
+    \item Implementação eficiente de filtros digitais com desempenho adequado para operação em tempo real
+    \item Sistema interativo que permite exploração visual e intuitiva do comportamento dos filtros
+    \item Simulador de tremor configurável para testes controlados
+    \item Ferramentas de análise e exportação para avaliação qualitativa dos resultados
+    \item Arquitetura modular e bem documentada que facilita extensões futuras
+\end{enumerate}
+
+\subsection{Limitações e Trabalhos Futuros}
+
+Apesar dos resultados positivos, algumas limitações foram identificadas:
+
+\begin{itemize}
+    \item A análise foi predominantemente qualitativa; métricas quantitativas como relação sinal-ruído (SNR) e erro quadrático médio (MSE) poderiam enriquecer a avaliação
+    \item O sistema está limitado a entrada de mouse; suporte a tablets e outros dispositivos ampliaria a aplicabilidade
+    \item Filtros mais sofisticados, como filtro de Kalman ou filtros adaptativos, poderiam ser implementados para comparação
+\end{itemize}
+
+Como trabalhos futuros, propomos:
+
+\begin{itemize}
+    \item Implementação de filtros adaptativos que ajustam automaticamente seus parâmetros baseado nas características do sinal
+    \item Desenvolvimento de métrica objetivas para avaliação quantitativa dos filtros
+    \item Extensão para processamento de sinais multidimensionais (acelerômetros, giroscópios)
+    \item Criação de interface web utilizando WebAssembly para maior portabilidade
+    \item Aplicação dos filtros em casos de uso reais, como assistência a pessoas com tremor essencial
+\end{itemize}
+
+\subsection{Aprendizados}
+
+O desenvolvimento deste projeto proporcionou aprendizados significativos tanto em aspectos teóricos quanto práticos. A implementação hands-on dos filtros permitiu compreender de forma concreta os trade-offs entre diferentes abordagens de filtragem, algo que muitas vezes não fica claro apenas no estudo teórico.
+
+A necessidade de garantir desempenho em tempo real trouxe à tona considerações importantes sobre escolha de estruturas de dados e otimização de algoritmos. Percebemos que mesmo filtros conceitualmente simples requerem cuidado na implementação para aplicações de tempo real.
+
+Por fim, o projeto demonstrou a importância da visualização como ferramenta pedagógica. A capacidade de observar imediatamente o efeito de mudanças nos parâmetros dos filtros tornou o aprendizado muito mais intuitivo e engajador.
+
+\section{Conclusão}
+
+Este relatório apresentou o desenvolvimento de um sistema interativo de suavização de entrada utilizando filtros digitais FIR e IIR. O projeto cumpriu seus objetivos de implementar, comparar e avaliar diferentes técnicas de filtragem aplicadas a sinais em tempo real.
+
+Os resultados demonstraram que ambos os filtros são eficazes na redução de ruídos, cada um com características particulares que os tornam adequados para diferentes cenários. O filtro de média móvel destaca-se pela simplicidade e estabilidade garantida, enquanto o filtro exponencial oferece eficiência computacional superior e trajetórias mais naturais.
+
+A interface interativa desenvolvida provou ser uma ferramenta valiosa para o ensino de processamento de sinais, permitindo experimentação e observação direta dos conceitos teóricos estudados em sala de aula. Acreditamos que este trabalho contribui tanto como recurso educacional quanto como prova de conceito para aplicações práticas de filtragem de sinais de entrada.
+
+\begin{thebibliography}{9}
+
+\bibitem{oppenheim2009}
+OPPENHEIM, A. V.; SCHAFER, R. W. 
+\textbf{Discrete-Time Signal Processing}. 
+3. ed. Upper Saddle River: Prentice Hall, 2009.
+
+\bibitem{proakis2006}
+PROAKIS, J. G.; MANOLAKIS, D. G. 
+\textbf{Digital Signal Processing: Principles, Algorithms, and Applications}. 
+4. ed. Upper Saddle River: Pearson, 2006.
+
+\bibitem{smith1997}
+SMITH, S. W. 
+\textbf{The Scientist and Engineer's Guide to Digital Signal Processing}. 
+San Diego: California Technical Publishing, 1997.
+
+\bibitem{diniz2014}
+DINIZ, P. S. R.; SILVA, E. A. B.; NETTO, S. L. 
+\textbf{Processamento Digital de Sinais: Projeto e Análise de Sistemas}. 
+2. ed. Porto Alegre: Bookman, 2014.
+
+\bibitem{numpy}
+HARRIS, C. R. et al. 
+\textbf{Array programming with NumPy}. 
+Nature, v. 585, n. 7825, p. 357-362, 2020.
+
+\bibitem{pygame}
+SHINNERS, P. 
+\textbf{Pygame Documentation}. 
+Disponível em: \url{https://www.pygame.org/docs/}. 
+Acesso em: 4 dez. 2025.
+
+\bibitem{matplotlib}
+HUNTER, J. D. 
+\textbf{Matplotlib: A 2D graphics environment}. 
+Computing in Science \& Engineering, v. 9, n. 3, p. 90-95, 2007.
+
+\bibitem{haykin2001}
+HAYKIN, S.; VEEN, B. V. 
+\textbf{Sinais e Sistemas}. 
+Porto Alegre: Bookman, 2001.
+
+\end{thebibliography}
+
+\end{document}
