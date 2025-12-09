@@ -54,18 +54,22 @@ def handle_events(
     visibility: VisibilityState,
     param_indicator: ParamChangeIndicator,
     fullscreen: bool,
-) -> Tuple[bool, bool, bool, bool, Optional[str]]:
+) -> Tuple[bool, bool, bool, bool, Optional[str], bool]:
+    reset_requested = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            return False, history_enabled, fullscreen, False, None
+            return False, history_enabled, fullscreen, False, None, reset_requested
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                return False, history_enabled, fullscreen, False, None
+                return False, history_enabled, fullscreen, False, None, reset_requested
             if event.key == pygame.K_SPACE and (event.mod & pygame.KMOD_CTRL):
-                return True, history_enabled, fullscreen, False, "tremor"
+                return True, history_enabled, fullscreen, False, "tremor", reset_requested
             if event.key == pygame.K_d and (event.mod & pygame.KMOD_CTRL):
-                return True, history_enabled, fullscreen, False, "drift"
+                return True, history_enabled, fullscreen, False, "drift", reset_requested
+            if event.key == pygame.K_r:
+                reset_requested = True
+                continue
             result = _handle_key(
                 event.key, smoother, history_enabled, view_transform,
                 visibility, param_indicator, fullscreen
@@ -73,10 +77,10 @@ def handle_events(
             if result is not None:
                 history_enabled, fullscreen, generate_3d = result
                 if generate_3d:
-                    return True, history_enabled, fullscreen, True, None
+                    return True, history_enabled, fullscreen, True, None, reset_requested
 
 
-    return True, history_enabled, fullscreen, False, None
+    return True, history_enabled, fullscreen, False, None, reset_requested
 
 
 def _handle_key(
@@ -222,10 +226,11 @@ def _draw_hud(
             "  RIGHT / LEFT -> aumenta/diminui IIR alpha",
             "  H            -> liga/desliga histórico",
             f"  {toggle_keys:<12} -> toggle visibilidade",
+            "  R            -> reset global (filtros, histórico, tremor e drift)",
             "  F11          -> tela cheia",
             "  G            -> gerar gráfico 3D",
-            "  CTRL+SPACE    -> configurar tremor",
-            "  CTRL+D        -> configurar drift",
+            "  CTRL+SPACE   -> configurar tremor",
+            "  CTRL+D       -> configurar drift",
             "  ESC          -> sair",
         ]
     )

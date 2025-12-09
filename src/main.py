@@ -39,6 +39,33 @@ from ui_state import (
 )
 
 
+def reset_app_state(
+    smoother: InputSmoother,
+    view_transform: ViewTransform,
+    visibility: VisibilityState,
+    metrics: MetricsTracker,
+    param_indicator: ParamChangeIndicator,
+    tremor_sim: TremorSimulator,
+    drift_sim: DriftSimulator,
+) -> bool:
+    smoother.reset()
+    view_transform.reset()
+    visibility.reset()
+    metrics.reset()
+    param_indicator.reset()
+
+    tremor_sim.set_enabled(TREMOR_ENABLED)
+    tremor_sim.set_intensity(TREMOR_INTENSITY)
+    tremor_sim.set_frequency(TREMOR_FREQUENCY)
+
+    drift_sim.set_enabled(DRIFT_ENABLED)
+    drift_sim.set_speed(DRIFT_PIXELS_PER_SECOND)
+    drift_sim.set_direction(DRIFT_DIRECTION_DEG)
+    drift_sim.reset()
+
+    return DEFAULT_HISTORY_ENABLED
+
+
 def main() -> None:
     pygame.init()
     screen, fullscreen = create_window()
@@ -98,7 +125,14 @@ def main() -> None:
                     if tremor_modal.slider_dragging:
                         tremor_modal.handle_mouse(event.pos, 0, True)
         else:
-            running, history_enabled, fullscreen, generate_3d, modal_to_open = handle_events(
+            (
+                running,
+                history_enabled,
+                fullscreen,
+                generate_3d,
+                modal_to_open,
+                reset_requested,
+            ) = handle_events(
                 smoother,
                 history_enabled,
                 view_transform,
@@ -112,6 +146,17 @@ def main() -> None:
 
             if not running:
                 break
+
+            if reset_requested:
+                history_enabled = reset_app_state(
+                    smoother,
+                    view_transform,
+                    visibility,
+                    metrics,
+                    param_indicator,
+                    tremor_sim,
+                    drift_sim,
+                )
 
         is_currently_fullscreen = bool(screen.get_flags() & pygame.FULLSCREEN)
         if fullscreen != is_currently_fullscreen:

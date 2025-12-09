@@ -41,9 +41,8 @@ Visualizador em tempo real de suavização de entrada (mouse) usando média móv
 ### Novos Controles de Visualização
 - `1`, `2`, `3`: toggle de visibilidade das linhas (Raw, Moving Average, Exponential Smoothing).
 - `4`: toggle da linha de correção de drift (Drift corr.).
-- `Scroll do Mouse`: zoom in/out.
 - `Botão do Meio do Mouse` (arrastar): pan (mover a visualização).
-- `R`: reset zoom e pan.
+- `R`: reset global (filtros, histórico, tremor e drift).
 - `F11`: alterna modo tela cheia.
 
 ### Simulações (Tremor/Drift)
@@ -87,7 +86,7 @@ Ao pressionar `G`, são gerados dois gráficos 3D salvos na pasta `output/`:
 ## Arquitetura rápida
 - `src/main.py`: laço principal, inicialização e orquestração.
 - `src/ui.py`: entrada de usuário (teclas, mouse), renderização e gerenciamento de estado visual.
-- `src/ui_state.py`: classes para gerenciar estado da UI (zoom, pan, visibilidade, métricas).
+- `src/ui_state.py`: classes para gerenciar estado da UI (visibilidade, métricas).
 - `src/input_device.py`: estruturas de dados e filtros (média móvel e IIR) com buffers.
 - `src/filters.py`: funções puras de filtragem.
 - `src/tremor_simulator.py`: simulação de tremor e drift artificial no input do mouse.

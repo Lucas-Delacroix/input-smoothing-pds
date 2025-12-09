@@ -46,6 +46,11 @@ class VisibilityState:
     def set_visible(self, filter_id: str, visible: bool) -> None:
         self._filters[filter_id] = visible
 
+    def reset(self) -> None:
+        self._filters = {
+            f.id: f.visibility_default for f in FILTERS
+        }
+
 
 @dataclass
 class MetricsTracker:
@@ -72,6 +77,10 @@ class MetricsTracker:
             return 0.0
         return sum(self.latency_history) / len(self.latency_history)
 
+    def reset(self) -> None:
+        self.fps_history.clear()
+        self.latency_history.clear()
+
 
 @dataclass
 class ParamChangeIndicator:
@@ -88,3 +97,7 @@ class ParamChangeIndicator:
             if self.timer <= 0:
                 self.active = False
                 self.timer = 0
+
+    def reset(self) -> None:
+        self.active = False
+        self.timer = 0

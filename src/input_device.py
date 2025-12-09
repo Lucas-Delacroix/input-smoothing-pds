@@ -48,12 +48,18 @@ class InputSmoother:
         max_alpha: float,
         drift_window: int,
     ):
-        self._window_size = max(min_window, window_size)
-        self._alpha = self._clamp(alpha, min_alpha, max_alpha)
+        initial_window_size = max(min_window, window_size)
+        initial_alpha = self._clamp(alpha, min_alpha, max_alpha)
+
+        self._window_size = initial_window_size
+        self._alpha = initial_alpha
         self._min_window = min_window
         self._min_alpha = min_alpha
         self._max_alpha = max_alpha
         self._drift_window = max(1, drift_window)
+
+        self._default_window_size = initial_window_size
+        self._default_alpha = initial_alpha
 
         self._sample_buffer: Deque[Point] = deque(maxlen=buffer_size)
         self.raw_trace = TraceBuffer(buffer_size)
@@ -137,6 +143,11 @@ class InputSmoother:
         self._sample_buffer.clear()
         self._exp_point = None
         self.drift_corrected_trace.clear()
+
+    def reset(self) -> None:
+        self._window_size = self._default_window_size
+        self._alpha = self._default_alpha
+        self.clear_history()
 
     @property
     def window_size(self) -> int:
